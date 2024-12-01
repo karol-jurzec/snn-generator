@@ -1,0 +1,26 @@
+---
+triple:          'arm64-apple-darwin'
+binary-path:     '/Users/karol/Documents/repos/snn_generator/src/main'
+relocations:
+  - { offsetInCU: 0x26, offset: 0x26, size: 0x8, addend: 0x0, symName: _initialize_neuron, symObjAddr: 0x0, symBinAddr: 0x100002BC0, symSize: 0x6C }
+  - { offsetInCU: 0x52, offset: 0x52, size: 0x8, addend: 0x0, symName: _initialize_neuron, symObjAddr: 0x0, symBinAddr: 0x100002BC0, symSize: 0x6C }
+  - { offsetInCU: 0xAE, offset: 0xAE, size: 0x8, addend: 0x0, symName: _update_neuron, symObjAddr: 0x6C, symBinAddr: 0x100002C2C, symSize: 0xC8 }
+  - { offsetInCU: 0xE0, offset: 0xE0, size: 0x8, addend: 0x0, symName: _initalize_layer, symObjAddr: 0x134, symBinAddr: 0x100002CF4, symSize: 0x7C }
+  - { offsetInCU: 0x158, offset: 0x158, size: 0x8, addend: 0x0, symName: _update_layer, symObjAddr: 0x1B0, symBinAddr: 0x100002D70, symSize: 0x6C }
+  - { offsetInCU: 0x1A6, offset: 0x1A6, size: 0x8, addend: 0x0, symName: _reset_spike_counts, symObjAddr: 0x21C, symBinAddr: 0x100002DDC, symSize: 0x50 }
+  - { offsetInCU: 0x1E6, offset: 0x1E6, size: 0x8, addend: 0x0, symName: _allocate_2d_array, symObjAddr: 0x26C, symBinAddr: 0x100002E2C, symSize: 0x80 }
+  - { offsetInCU: 0x246, offset: 0x246, size: 0x8, addend: 0x0, symName: _initialize_conv2d_layer, symObjAddr: 0x2EC, symBinAddr: 0x100002EAC, symSize: 0xFC }
+  - { offsetInCU: 0x2CC, offset: 0x2CC, size: 0x8, addend: 0x0, symName: _free_conv2d_layer, symObjAddr: 0x3E8, symBinAddr: 0x100002FA8, symSize: 0x74 }
+  - { offsetInCU: 0x30C, offset: 0x30C, size: 0x8, addend: 0x0, symName: _conv2d_forward, symObjAddr: 0x45C, symBinAddr: 0x10000301C, symSize: 0x24C }
+  - { offsetInCU: 0x422, offset: 0x422, size: 0x8, addend: 0x0, symName: _initialize_maxpool2d_layer, symObjAddr: 0x6A8, symBinAddr: 0x100003268, symSize: 0x30 }
+  - { offsetInCU: 0x462, offset: 0x462, size: 0x8, addend: 0x0, symName: _maxpool2d_forward, symObjAddr: 0x6D8, symBinAddr: 0x100003298, symSize: 0x208 }
+  - { offsetInCU: 0x578, offset: 0x578, size: 0x8, addend: 0x0, symName: _initialize_linear_layer, symObjAddr: 0x8E0, symBinAddr: 0x1000034A0, symSize: 0x12C }
+  - { offsetInCU: 0x5F0, offset: 0x5F0, size: 0x8, addend: 0x0, symName: _linear_forward, symObjAddr: 0xA0C, symBinAddr: 0x1000035CC, symSize: 0x100 }
+  - { offsetInCU: 0x66C, offset: 0x66C, size: 0x8, addend: 0x0, symName: _free_linear_layer, symObjAddr: 0xB0C, symBinAddr: 0x1000036CC, symSize: 0x80 }
+  - { offsetInCU: 0x6AC, offset: 0x6AC, size: 0x8, addend: 0x0, symName: _flatten_forward, symObjAddr: 0xB8C, symBinAddr: 0x10000374C, symSize: 0xE0 }
+  - { offsetInCU: 0x744, offset: 0x744, size: 0x8, addend: 0x0, symName: _initialize_snn, symObjAddr: 0xC6C, symBinAddr: 0x10000382C, symSize: 0xB8 }
+  - { offsetInCU: 0x768, offset: 0x768, size: 0x8, addend: 0x0, symName: _update_snn, symObjAddr: 0xD24, symBinAddr: 0x1000038E4, symSize: 0x32C }
+  - { offsetInCU: 0x8D4, offset: 0x8D4, size: 0x8, addend: 0x0, symName: _get_snn_output, symObjAddr: 0x1050, symBinAddr: 0x100003C10, symSize: 0x94 }
+  - { offsetInCU: 0x950, offset: 0x950, size: 0x8, addend: 0x0, symName: _get_snn_spike_counts, symObjAddr: 0x10E4, symBinAddr: 0x100003CA4, symSize: 0x8C }
+  - { offsetInCU: 0x9AC, offset: 0x9AC, size: 0x8, addend: 0x0, symName: _main, symObjAddr: 0x1170, symBinAddr: 0x100003D30, symSize: 0x1C8 }
+...
