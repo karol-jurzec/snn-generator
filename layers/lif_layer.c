@@ -14,7 +14,7 @@ void initalize_layer(LIFLayer *layer, float v_rest, float threshold, float v_res
 
 void update_layer(LIFLayer *layer, float input_currents[NUM_NEURONS]) {
     for(int i = 0; i < NUM_NEURONS; ++i) {
-        update_neuron(&layer->neurons[i], input_currents[i]);
+        layer->neurons[i].model_base.update_neuron(&layer->neurons[i], input_currents[i]);
     }
 }
 

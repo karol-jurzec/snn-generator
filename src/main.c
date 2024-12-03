@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "snn.c"
+#include "tests.c"
 #include "stdlib.h"
 
 int main(int argc, char *argv[]) {
@@ -26,23 +26,12 @@ int main(int argc, char *argv[]) {
     get_snn_spike_counts(&network);
     */ 
 
-   LIFNeuron leaky;
-   initialize_neuron(&leaky, 0.0, 1.0, 0.0, 0.8);
+    LIFNeuron* leaky = malloc(sizeof(LIFNeuron));
 
-   double arr[200];
-   for (int i = 0; i < 200; ++i) {
-       if (i < 100) {
-           arr[i] = 0.0;
-       } else if (i < 150) {
-           arr[i] = 0.25;
-       } else {
-           arr[i] = 0.0;
-       }
-    }
+    initialize_neuron(leaky, 0.0, 1.0, 0.0, 0.8);
+    single_lf_test(&(leaky->model_base));
+    free(leaky); // Free allocated memory
 
-    for (int i = 0; i < 200; ++i) {
-        update_neuron(&leaky, arr[i]);
-    }
 
     return 0;
 }
