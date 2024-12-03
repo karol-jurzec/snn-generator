@@ -20,7 +20,7 @@ void spiking_forward(void *self, float *input, size_t input_size) {
     printf("Performing Spiking Layer forward pass...\n");
     SpikingLayer* layer = (SpikingLayer*)self;
 
-    for (size_t i = 0; i < layer->num_neurons; i++) {
+    for (size_t i = 0; i < input_size; i++) {
         // Call the polymorphic update function for each neuron
         layer->neurons[i]->update_neuron(layer->neurons[i], input[i]);
 

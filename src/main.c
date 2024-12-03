@@ -2,9 +2,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "tests.c"
 #include "stdlib.h"
 
+#include "../include/tests.h"
 #include "../include/models/lif_neuron.h"
 #include "../include/models/izhikevich_neuron.h"
 

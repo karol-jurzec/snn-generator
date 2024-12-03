@@ -4,6 +4,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "../../include/utils/snn_plot.h"
+
 void plot_single_neuron(const char *filename, const char *output_png) {
     FILE *gnuplot = popen("gnuplot -persistent", "w");
     if (gnuplot == NULL) {

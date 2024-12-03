@@ -2,12 +2,13 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "../include/tests.h"
 #include "../include/network.h"
 
 #include "../include/models/model_base.h"
 #include "../include/models/lif_neuron.h"
 
-#include "../src/utils/snn_plot.c"
+#include "../include/utils/snn_plot.h"
 #include "../include/utils/layer_utils.h"
 #include "../include/utils/network_loader.h"
 #include "../include/layers/conv2d_layer.h"
@@ -19,8 +20,8 @@
 
 // Print the output feature map for inspection
 void print_output(float *output, size_t out_channels, size_t output_dim) {
-    for (int oc = 0; oc < out_channels; oc++) {
-        printf("Output Channel %d:\n", oc);
+    for (size_t oc = 0; oc < out_channels; oc++) {
+        printf("Output Channel %zu:\n", oc);
         for (size_t y = 0; y < output_dim; y++) {
             for (size_t x = 0; x < output_dim; x++) {
                 printf("%0.2f ", output[(oc * output_dim * output_dim) + (y * output_dim + x)]);
@@ -234,7 +235,7 @@ void network_test() {
 }
 
 void network_loader_test() { 
-    Network *network = initialize_network_from_file("../../example_model.json");
+    Network *network = initialize_network_from_file("example_model.json");
     if (network) {
         printf("Network initialized successfully!\n");
         // Use the network here (e.g., forward pass, training, etc.)

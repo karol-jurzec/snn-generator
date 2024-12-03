@@ -4,7 +4,9 @@
             "name": "Mac",
             "includePath": [
                 "${workspaceFolder}/**",
-                "/opt/homebrew/Cellar/cjson/1.7.18/include"
+                "/opt/homebrew/Cellar/cjson/1.7.18/include",
+                "/opt/homebrew/opt",
+                "/opt/homebrew/include"
             ],
             "defines": [],
             "macFrameworkPath": [
