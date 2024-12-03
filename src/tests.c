@@ -2,11 +2,14 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "../include/network.h"
+
 #include "../include/models/model_base.h"
 #include "../include/models/lif_neuron.h"
 
 #include "../src/utils/snn_plot.c"
 #include "../include/utils/layer_utils.h"
+#include "../include/utils/network_loader.h"
 #include "../include/layers/conv2d_layer.h"
 #include "../include/layers/maxpool2d_layer.h"
 #include "../include/layers/flatten_layer.h"
@@ -194,4 +197,50 @@ void spiking_layer_test() {
     }
     free(input);
     spiking_free(&spiking_layer);
+}
+
+void network_test() { 
+    size_t input_size = 28 * 28 * 2; // Example input size for 2-channel image
+    float *input = (float *)malloc(input_size * sizeof(float));
+
+    for (size_t i = 0; i < input_size; i++) {
+        input[i] = (float)i / input_size;
+    }
+
+    // Create a network with 3 layers
+    Network *network = create_network(3);
+
+    // Initialize and add Conv2D layer
+    Conv2DLayer *conv_layer = (Conv2DLayer *)malloc(sizeof(Conv2DLayer));
+    conv2d_initialize(conv_layer, 2, 12, 5, 1, 0);
+    add_layer(network, (LayerBase *)conv_layer, 0);
+
+    // Initialize and add MaxPool2D layer
+    MaxPool2DLayer *pool_layer = (MaxPool2DLayer *)malloc(sizeof(MaxPool2DLayer));
+    maxpool2d_initialize(pool_layer, 2, 2, 0);
+    add_layer(network, (LayerBase *)pool_layer, 1);
+
+    // Initialize and add Flatten layer
+    FlattenLayer *flatten_layer = (FlattenLayer *)malloc(sizeof(FlattenLayer));
+    flatten_initialize(flatten_layer, conv_layer->output_size);
+    add_layer(network, (LayerBase *)flatten_layer, 2);
+
+    // Perform forward pass
+    forward(network, input, input_size);
+
+    // Free resources
+    free(input);
+    free_network(network);
+}
+
+void network_loader_test() { 
+    Network *network = initialize_network_from_file("../../example_model.json");
+    if (network) {
+        printf("Network initialized successfully!\n");
+        // Use the network here (e.g., forward pass, training, etc.)
+
+        free_network(network);
+    } else {
+        printf("Failed to initialize network.\n");
+    }
 }

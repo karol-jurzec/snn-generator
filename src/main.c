@@ -48,9 +48,12 @@ int main(int argc, char *argv[]) {
     maxpool2d_test();
     flatten_test();
     linear_test();
+    spiking_layer_test();
+    network_test();
    */
 
-    spiking_layer_test();
+
+    network_loader_test();
 
 
 
