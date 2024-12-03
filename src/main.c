@@ -5,6 +5,9 @@
 #include "tests.c"
 #include "stdlib.h"
 
+#include "../include/models/lif_neuron.h"
+#include "../include/models/izhikevich_neuron.h"
+
 int main(int argc, char *argv[]) {
 
     /* 
@@ -24,13 +27,31 @@ int main(int argc, char *argv[]) {
     update_snn(&network,  array, 4);
 
     get_snn_spike_counts(&network);
-    */ 
 
     LIFNeuron* leaky = malloc(sizeof(LIFNeuron));
 
     initialize_neuron(leaky, 0.0, 1.0, 0.0, 0.8);
     single_lf_test(&(leaky->model_base));
     free(leaky); // Free allocated memory
+    */ 
+   
+   /*
+    LIFNeuron lif;
+    lif_initialize(&lif, 0.0f, 1.0f, 0.0f, 0.8f);
+    single_neuron_test((ModelBase *)&lif, "out/single_neuron_leaky.png");
+
+    IzhikevichNeuron izh;
+    izhikevich_initialize(&izh, 0.1f, 0.1f, 0.1f, 0.1f, 0.0f);
+    single_neuron_test((ModelBase *)&izh, "out/single_neuron_izh.png");
+
+    conv2d_test();
+    maxpool2d_test();
+    flatten_test();
+    linear_test();
+   */
+
+    spiking_layer_test();
+
 
 
     return 0;
