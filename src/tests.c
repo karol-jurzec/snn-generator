@@ -32,6 +32,20 @@ void print_output(float *output, size_t out_channels, size_t output_dim) {
     }
 }
 
+void print_output_spikes(float *output, size_t num_neurons) {
+    printf("Output Spikes:\n");
+    for (size_t i = 0; i < num_neurons; i++) {
+        printf("Neuron %lu: Spiked = %0.1f\n", i, output[i]);
+    }
+    printf("\n");
+}
+
+void generate_synthetic_input(float *input, size_t size) {
+    for (size_t i = 0; i < size; i++) {
+        input[i] = (float)(i % 255) / 255.0f; // Normalize pixel values to [0, 1]
+    }
+}
+
 void single_neuron_test(ModelBase *model_base, const char* filename) {
     int dt = 200;
     FILE *log_file = fopen("out/single_neuron_output.txt", "w");
@@ -235,13 +249,26 @@ void network_test() {
 }
 
 void network_loader_test() { 
+    // Load the network from the config file
     Network *network = initialize_network_from_file("example_model.json");
-    if (network) {
-        printf("Network initialized successfully!\n");
-        // Use the network here (e.g., forward pass, training, etc.)
-
-        free_network(network);
-    } else {
+    if (!network) {
         printf("Failed to initialize network.\n");
+        return -1;
     }
+
+    // Generate synthetic input (28x28 image with 2 channels)
+    size_t input_size = 28 * 28 * 2;
+    float *input = (float *)malloc(input_size * sizeof(float));
+    generate_synthetic_input(input, input_size);
+
+    // Perform forward pass
+    forward(network, input, input_size);
+
+    // Assume last layer is a spiking layer and print spikes
+    SpikingLayer *last_layer = (SpikingLayer *)network->layers[network->num_layers - 1];
+    print_output_spikes(last_layer->output_spikes, last_layer->num_neurons);
+
+    // Free resources
+    free(input);
+    free_network(network); 
 }

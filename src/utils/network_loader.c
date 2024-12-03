@@ -12,9 +12,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 
-// Helper function to initialize neurons based on type
 ModelBase **initialize_neurons(const char *neuron_type, size_t num_neurons, struct json_object *neuron_config) {
     ModelBase **neurons = (ModelBase **)malloc(num_neurons * sizeof(ModelBase *));
     
@@ -30,7 +28,6 @@ ModelBase **initialize_neurons(const char *neuron_type, size_t num_neurons, stru
     return neurons;
 }
 
-// Helper function to parse and add a layer based on its type
 void parse_and_add_layer(Network *network, struct json_object *layer_config, size_t index) {
     const char *type = json_object_get_string(json_object_object_get(layer_config, "type"));
 
@@ -78,7 +75,7 @@ Network *initialize_network_from_file(const char *config_path) {
         return NULL;
     }
 
-    char buffer[2 * 8192];
+    char buffer[8192];
     fread(buffer, 1, sizeof(buffer), fp);
     fclose(fp);
 

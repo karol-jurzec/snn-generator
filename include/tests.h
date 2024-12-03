@@ -12,5 +12,7 @@ void flatten_test();
 void conv2d_test();
 void linear_test();
 void print_output();
+void generate_synthetic_input(float *input, size_t size);
+void print_output_spikes(float *output, size_t num_neurons);
 
 #endif // TESTS_H

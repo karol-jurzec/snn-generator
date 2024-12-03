@@ -5,6 +5,7 @@
 
 // Initialize the spiking layer with given neurons
 void spiking_initialize(SpikingLayer *layer, size_t num_neurons, ModelBase **neuron_models) {
+    layer->base.forward = spiking_forward;
     layer->num_neurons = num_neurons;
     layer->neurons = (ModelBase **)malloc(num_neurons * sizeof(ModelBase *));
     layer->output_spikes = (float *)malloc(num_neurons * sizeof(float));

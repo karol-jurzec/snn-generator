@@ -7,8 +7,8 @@
 
 // Structure for the generic Spiking layer
 typedef struct {
-    ModelBase **neurons;        // Array of pointers to neurons (polymorphic)
     LayerBase base;             // Inherits LayerBase for polymorphic forward
+    ModelBase **neurons;        // Array of pointers to neurons (polymorphic)
     size_t num_neurons;         // Number of neurons in the layer
     float *output_spikes;       // Output spikes (1 if spiked, 0 otherwise)
 } SpikingLayer;
