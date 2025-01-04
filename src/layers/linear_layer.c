@@ -3,7 +3,6 @@
 
 #include "../../include/layers/linear_layer.h"
 
-// Initialize Linear layer with random weights and biases
 void linear_initialize(LinearLayer *layer, size_t in_features, size_t out_features) {
     layer->base.forward = linear_forward;
     layer->in_features = in_features;
@@ -11,7 +10,8 @@ void linear_initialize(LinearLayer *layer, size_t in_features, size_t out_featur
 
     layer->weights = (float *)malloc(in_features * out_features * sizeof(float));
     layer->biases = (float *)malloc(out_features * sizeof(float));
-    layer->output = (float *)malloc(out_features * sizeof(float));
+    layer->base.output = (float *)malloc(out_features * sizeof(float));
+    layer->base.output_size = out_features;
 
     // Initialize weights and biases (random small values for weights, zeros for biases)
     for (size_t i = 0; i < in_features * out_features; i++) {
@@ -22,7 +22,6 @@ void linear_initialize(LinearLayer *layer, size_t in_features, size_t out_featur
     }
 }
 
-// Forward pass: perform matrix multiplication and add biases
 void linear_forward(void *self, float *input, size_t input_size) {
     LinearLayer *layer = (LinearLayer *)self;
 
@@ -33,7 +32,7 @@ void linear_forward(void *self, float *input, size_t input_size) {
         for (size_t i = 0; i < layer->in_features; i++) {
             sum += input[i] * layer->weights[o * layer->in_features + i];
         }
-        layer->output[o] = sum + layer->biases[o];
+        layer->base.output[o] = sum + layer->biases[o];
     }
 }
 

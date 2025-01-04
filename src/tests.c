@@ -253,7 +253,6 @@ void network_loader_test() {
     Network *network = initialize_network_from_file("example_model.json");
     if (!network) {
         printf("Failed to initialize network.\n");
-        return -1;
     }
 
     // Generate synthetic input (28x28 image with 2 channels)
@@ -262,11 +261,13 @@ void network_loader_test() {
     generate_synthetic_input(input, input_size);
 
     // Perform forward pass
-    forward(network, input, input_size);
+    for(int i = 0; i < 10; ++i) {
+        forward(network, input, input_size);
+    }
 
     // Assume last layer is a spiking layer and print spikes
     SpikingLayer *last_layer = (SpikingLayer *)network->layers[network->num_layers - 1];
-    print_output_spikes(last_layer->output_spikes, last_layer->num_neurons);
+    print_output_spikes(last_layer->base.output, last_layer->num_neurons);
 
     // Free resources
     free(input);

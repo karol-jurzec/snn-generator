@@ -16,10 +16,10 @@ void lif_update(void *self, float input_current) {
     LIFNeuron *neuron = (LIFNeuron *)self;
     neuron->base.v = neuron->beta * neuron->base.v + input_current;
 
-    printf("LIF Neuron membrane potential: %f\n", neuron->base.v);
+    //printf("LIF Neuron membrane potential: %f\n", neuron->base.v);
 
     if (neuron->base.v >= neuron->base.v_threshold) {
-        printf("LIF Neuron spiked!\n");
+        //printf("LIF Neuron spiked!\n");
         neuron->spiked = 1;
         neuron->base.v = neuron->v_reset;
         neuron->spike_count++;

@@ -30,9 +30,11 @@ void forward(Network *network, float *input, size_t input_size) {
         layer->forward(layer, current_input, current_input_size);
 
         // Update current input to the output of the current layer
-        if (i < network->num_layers - 1) {
-            LayerBase *next_layer = network->layers[i + 1];
-            current_input = (float *)((char *)next_layer + sizeof(LayerBase)); // Use output from next layer
+        current_input = layer->output; // Correctly reference the layer's output
+        current_input_size = layer->output_size; // Update input size for the next layer
+        
+        for (size_t i = 0; i < layer->output_size && i < 10; i++) {
+            printf("output[%zu] = %f\n", i, layer->output[i]);
         }
     }
 }

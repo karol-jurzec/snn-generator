@@ -9,6 +9,8 @@
 // Base structure for layers
 typedef struct {
     LAYER_FORWARD_FUNC(forward);  // Forward function pointer for layers
+    float *output;                // Output buffer for layers
+    int output_size;
 } LayerBase;
 
 #endif // LAYER_BASE_H
