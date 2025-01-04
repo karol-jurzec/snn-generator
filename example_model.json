@@ -8,7 +8,7 @@
         },
         {
             "type": "SpikingLayer",
-            "num_neurons": 12,
+            "num_neurons": 6912,  
             "neuron_type": "Leaky",
             "beta": 0.5
         },
@@ -21,12 +21,12 @@
         },
         {
             "type": "Linear",
-            "in_features": 800,
+            "in_features": 1728,  
             "out_features": 10
         },
         {
             "type": "SpikingLayer",
-            "num_neurons": 10,
+            "num_neurons": 10,  
             "neuron_type": "Leaky",
             "beta": 0.5
         }
