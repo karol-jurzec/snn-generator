@@ -50,11 +50,10 @@ int main(int argc, char *argv[]) {
     linear_test();
     spiking_layer_test();
     network_test();
+    network_loader_test();
    */
 
-
-    network_loader_test();
-
+    nmnist_loader_test();
 
 
     return 0;

@@ -1,11 +1,33 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdbool.h>
 #include <dirent.h>
 #include "../../include/utils/nmnist_loader.h"
 
+// Helper to stabilize the dataset (motion compensation)
+static void stabilize_events(NMNISTEvent *events, size_t num_events) {
+    for (size_t i = 0; i < num_events; i++) {
+        unsigned int ts = events[i].timestamp;
+
+        if (ts <= 105000) {
+            events[i].x -= (3.5f * ts / 105000);
+            events[i].y -= (7.0f * ts / 105000);
+        } else if (ts <= 210000) {
+            events[i].x -= (3.5f + (3.5f * (ts - 105000) / 105000));
+            events[i].y -= (7.0f - (7.0f * (ts - 105000) / 105000));
+        } else {
+            events[i].x -= (7.0f - (7.0f * (ts - 210000) / 105000));
+        }
+
+        // Clamp coordinates and polarity
+        if (events[i].x < 1) events[i].x = 1;
+        if (events[i].y < 1) events[i].y = 1;
+    }
+}
+
 // Helper function to load a single NMNIST file
-NMNISTSample load_nmnist_file(const char *file_path, int label) {
+static NMNISTSample load_nmnist_file(const char *file_path, int label, bool stabilize) {
     FILE *file = fopen(file_path, "rb");
     if (!file) {
         printf("Error: Could not open file %s\n", file_path);
@@ -17,26 +39,31 @@ NMNISTSample load_nmnist_file(const char *file_path, int label) {
     size_t file_size = ftell(file);
     fseek(file, 0, SEEK_SET);
 
-    size_t num_events = file_size / 5;  // Each event is 5 bytes (1 byte each for x, y, polarity, 2 bytes for timestamp)
-
+    size_t num_events = file_size / 5;  // Each event is 5 bytes
     NMNISTEvent *events = (NMNISTEvent *)malloc(num_events * sizeof(NMNISTEvent));
     if (!events) {
         printf("Error: Memory allocation for NMNIST events failed\n");
+        fclose(file);
         exit(EXIT_FAILURE);
     }
 
-    // Read events from the file
+    // Read and decode events
     for (size_t i = 0; i < num_events; i++) {
         unsigned char buffer[5];
         fread(buffer, 1, 5, file);
 
-        events[i].x = buffer[0];
-        events[i].y = buffer[1];
-        events[i].polarity = buffer[2];
-        events[i].timestamp = (buffer[3] << 8) | buffer[4];
+        events[i].x = buffer[0];  // X-address
+        events[i].y = buffer[1];  // Y-address
+        events[i].polarity = (buffer[2] >> 7) & 1;  // Polarity (MSB)
+        events[i].timestamp = ((buffer[2] & 0x7F) << 16) | (buffer[3] << 8) | buffer[4];  // Timestamp
     }
 
     fclose(file);
+
+    // Stabilize events if required
+    if (stabilize) {
+        stabilize_events(events, num_events);
+    }
 
     // Construct the sample
     NMNISTSample sample;
@@ -48,7 +75,7 @@ NMNISTSample load_nmnist_file(const char *file_path, int label) {
 }
 
 // Load the entire NMNIST dataset
-NMNISTDataset *load_nmnist_dataset(const char *data_dir, size_t max_samples) {
+NMNISTDataset *load_nmnist_dataset(const char *data_dir, size_t max_samples, bool stabilize) {
     NMNISTDataset *dataset = (NMNISTDataset *)malloc(sizeof(NMNISTDataset));
     if (!dataset) {
         printf("Error: Memory allocation for NMNIST dataset failed\n");
@@ -58,6 +85,7 @@ NMNISTDataset *load_nmnist_dataset(const char *data_dir, size_t max_samples) {
     dataset->samples = (NMNISTSample *)malloc(max_samples * sizeof(NMNISTSample));
     if (!dataset->samples) {
         printf("Error: Memory allocation for NMNIST samples failed\n");
+        free(dataset);
         exit(EXIT_FAILURE);
     }
 
@@ -68,11 +96,10 @@ NMNISTDataset *load_nmnist_dataset(const char *data_dir, size_t max_samples) {
         char digit_dir[256];
         snprintf(digit_dir, sizeof(digit_dir), "%s/%d", data_dir, digit);
 
-        // Open the directory for the digit
         DIR *dir = opendir(digit_dir);
         if (!dir) {
             printf("Error: Could not open directory %s\n", digit_dir);
-            exit(EXIT_FAILURE);
+            continue;  // Skip invalid directories
         }
 
         struct dirent *entry;
@@ -83,7 +110,7 @@ NMNISTDataset *load_nmnist_dataset(const char *data_dir, size_t max_samples) {
                 snprintf(file_path, sizeof(file_path), "%s/%s", digit_dir, entry->d_name);
 
                 // Load the NMNIST sample
-                NMNISTSample sample = load_nmnist_file(file_path, digit);
+                NMNISTSample sample = load_nmnist_file(file_path, digit, stabilize);
 
                 // Add to the dataset
                 if (dataset->num_samples < max_samples) {

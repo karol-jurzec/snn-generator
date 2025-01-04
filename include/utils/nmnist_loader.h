@@ -2,13 +2,14 @@
 #define NMNIST_LOADER_H
 
 #include <stddef.h>
+#include <stdbool.h>
 
 // NMNIST spike event structure
 typedef struct {
-    unsigned int timestamp;  // Time of the spike (in ms or some time unit)
+    unsigned int timestamp;  // Time of the spike in microseconds
     unsigned char x;         // X-coordinate of the spike
     unsigned char y;         // Y-coordinate of the spike
-    unsigned char polarity;  // Polarity (0 = off, 1 = on)
+    unsigned char polarity;  // Polarity (0 = OFF, 1 = ON)
 } NMNISTEvent;
 
 // NMNIST sample structure (spike trains for one digit)
@@ -25,7 +26,7 @@ typedef struct {
 } NMNISTDataset;
 
 // Function declarations
-NMNISTDataset *load_nmnist_dataset(const char *data_dir, size_t max_samples);
+NMNISTDataset *load_nmnist_dataset(const char *data_dir, size_t max_samples, bool stabilize);
 void free_nmnist_dataset(NMNISTDataset *dataset);
 
 #endif // NMNIST_LOADER_H

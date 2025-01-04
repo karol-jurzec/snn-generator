@@ -11,6 +11,8 @@
 #include "../include/utils/snn_plot.h"
 #include "../include/utils/layer_utils.h"
 #include "../include/utils/network_loader.h"
+#include "../include/utils/nmnist_loader.h"
+
 #include "../include/layers/conv2d_layer.h"
 #include "../include/layers/maxpool2d_layer.h"
 #include "../include/layers/flatten_layer.h"
@@ -273,3 +275,60 @@ void network_loader_test() {
     free(input);
     free_network(network); 
 }
+
+void print_sample(const NMNISTSample *sample, size_t max_events_to_display) {
+    printf("Label: %d\n", sample->label);
+    printf("Number of events: %zu\n", sample->num_events);
+
+    size_t num_events_to_display = sample->num_events < max_events_to_display
+                                       ? sample->num_events
+                                       : max_events_to_display;
+    for (size_t i = 0; i < num_events_to_display; i++) {
+        printf("Event %zu: X=%d, Y=%d, Polarity=%d, Timestamp=%u\n", i + 1,
+               sample->events[i].x, sample->events[i].y,
+               sample->events[i].polarity, sample->events[i].timestamp);
+    }
+
+    if (sample->num_events > max_events_to_display) {
+        printf("... (%zu more events not displayed)\n",
+               sample->num_events - max_events_to_display);
+    }
+}
+
+void nmnist_loader_test() {
+    // Directory containing the NMNIST dataset
+    const char *dataset_dir = "/Users/karol/Desktop/karol/agh/praca-snn/N-MNIST/Train";   
+
+    // Maximum number of samples to load for testing
+    size_t max_samples_to_load = 10000;
+
+    // Enable stabilization (true) or disable it (false)
+    bool stabilize = true;
+
+    printf("Loading NMNIST dataset with stabilization=%s...\n",
+           stabilize ? "ENABLED" : "DISABLED");
+
+    // Load the NMNIST dataset
+    NMNISTDataset *dataset =
+        load_nmnist_dataset(dataset_dir, max_samples_to_load, stabilize);
+
+    if (!dataset) {
+        printf("Error: Failed to load NMNIST dataset.\n");
+        return;
+    }
+
+    printf("Loaded %zu samples from NMNIST dataset.\n", dataset->num_samples);
+
+    // Display information for each loaded sample
+    for (size_t i = 0; i < 10; i++) {
+        printf("\nSample %zu:\n", i + 1);
+        print_sample(&dataset->samples[i], 10); // Display up to 10 events per sample
+    }
+
+    // Free the dataset
+    free_nmnist_dataset(dataset);
+
+    printf("NMNIST dataset successfully tested and freed.\n");
+    return;
+}
+
