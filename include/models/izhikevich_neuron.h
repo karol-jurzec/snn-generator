@@ -3,7 +3,6 @@
 
 #include "model_base.h"
 
-// Structure for Izhikevich neuron
 typedef struct {
     ModelBase base;  // Inherits ModelBase
     float u;         // Recovery variable

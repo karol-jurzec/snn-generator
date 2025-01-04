@@ -2,11 +2,15 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "../include/tests.h"
+#include "../include/network.h"
+
 #include "../include/models/model_base.h"
 #include "../include/models/lif_neuron.h"
 
-#include "../src/utils/snn_plot.c"
+#include "../include/utils/snn_plot.h"
 #include "../include/utils/layer_utils.h"
+#include "../include/utils/network_loader.h"
 #include "../include/layers/conv2d_layer.h"
 #include "../include/layers/maxpool2d_layer.h"
 #include "../include/layers/flatten_layer.h"
@@ -16,8 +20,8 @@
 
 // Print the output feature map for inspection
 void print_output(float *output, size_t out_channels, size_t output_dim) {
-    for (int oc = 0; oc < out_channels; oc++) {
-        printf("Output Channel %d:\n", oc);
+    for (size_t oc = 0; oc < out_channels; oc++) {
+        printf("Output Channel %zu:\n", oc);
         for (size_t y = 0; y < output_dim; y++) {
             for (size_t x = 0; x < output_dim; x++) {
                 printf("%0.2f ", output[(oc * output_dim * output_dim) + (y * output_dim + x)]);
@@ -25,6 +29,20 @@ void print_output(float *output, size_t out_channels, size_t output_dim) {
             printf("\n");
         }
         printf("\n");
+    }
+}
+
+void print_output_spikes(float *output, size_t num_neurons) {
+    printf("Output Spikes:\n");
+    for (size_t i = 0; i < num_neurons; i++) {
+        printf("Neuron %lu: Spiked = %0.1f\n", i, output[i]);
+    }
+    printf("\n");
+}
+
+void generate_synthetic_input(float *input, size_t size) {
+    for (size_t i = 0; i < size; i++) {
+        input[i] = (float)(i % 255) / 255.0f; // Normalize pixel values to [0, 1]
     }
 }
 
@@ -194,4 +212,64 @@ void spiking_layer_test() {
     }
     free(input);
     spiking_free(&spiking_layer);
+}
+
+void network_test() { 
+    size_t input_size = 28 * 28 * 2; // Example input size for 2-channel image
+    float *input = (float *)malloc(input_size * sizeof(float));
+
+    for (size_t i = 0; i < input_size; i++) {
+        input[i] = (float)i / input_size;
+    }
+
+    // Create a network with 3 layers
+    Network *network = create_network(3);
+
+    // Initialize and add Conv2D layer
+    Conv2DLayer *conv_layer = (Conv2DLayer *)malloc(sizeof(Conv2DLayer));
+    conv2d_initialize(conv_layer, 2, 12, 5, 1, 0);
+    add_layer(network, (LayerBase *)conv_layer, 0);
+
+    // Initialize and add MaxPool2D layer
+    MaxPool2DLayer *pool_layer = (MaxPool2DLayer *)malloc(sizeof(MaxPool2DLayer));
+    maxpool2d_initialize(pool_layer, 2, 2, 0);
+    add_layer(network, (LayerBase *)pool_layer, 1);
+
+    // Initialize and add Flatten layer
+    FlattenLayer *flatten_layer = (FlattenLayer *)malloc(sizeof(FlattenLayer));
+    flatten_initialize(flatten_layer, conv_layer->output_size);
+    add_layer(network, (LayerBase *)flatten_layer, 2);
+
+    // Perform forward pass
+    forward(network, input, input_size);
+
+    // Free resources
+    free(input);
+    free_network(network);
+}
+
+void network_loader_test() { 
+    // Load the network from the config file
+    Network *network = initialize_network_from_file("example_model.json");
+    if (!network) {
+        printf("Failed to initialize network.\n");
+    }
+
+    // Generate synthetic input (28x28 image with 2 channels)
+    size_t input_size = 28 * 28 * 2;
+    float *input = (float *)malloc(input_size * sizeof(float));
+    generate_synthetic_input(input, input_size);
+
+    // Perform forward pass
+    for(int i = 0; i < 10; ++i) {
+        forward(network, input, input_size);
+    }
+
+    // Assume last layer is a spiking layer and print spikes
+    SpikingLayer *last_layer = (SpikingLayer *)network->layers[network->num_layers - 1];
+    print_output_spikes(last_layer->base.output, last_layer->num_neurons);
+
+    // Free resources
+    free(input);
+    free_network(network); 
 }

@@ -24,10 +24,10 @@ void conv2d_initialize(Conv2DLayer *layer, int in_channels, int out_channels, in
     }
 
     size_t input_dim = 28;
-    layer->output_size = calculate_output_dim(input_dim, kernel_size, stride, padding) *
+    layer->base.output_size = calculate_output_dim(input_dim, kernel_size, stride, padding) *
                          calculate_output_dim(input_dim, kernel_size, stride, padding) *
                          out_channels;
-    layer->output = (float *)malloc(layer->output_size * sizeof(float));
+    layer->base.output = (float *)malloc(layer->base.output_size * sizeof(float));
 }
 
 void conv2d_forward(void *self, float *input, size_t input_size) {
@@ -54,7 +54,7 @@ void conv2d_forward(void *self, float *input, size_t input_size) {
                     }
                 }
                 size_t output_idx = (oc * output_dim * output_dim) + (oy * output_dim + ox);
-                layer->output[output_idx] = sum + layer->biases[oc];
+                layer->base.output[output_idx] = sum + layer->biases[oc];
             }
         }
     }
@@ -63,5 +63,5 @@ void conv2d_forward(void *self, float *input, size_t input_size) {
 void conv2d_free(Conv2DLayer *layer) {
     free(layer->weights);
     free(layer->biases);
-    free(layer->output);
+    free(layer->base.output);
 }

@@ -1,0 +1,24 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug snn_generator",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/snn_generator",  // Path to your compiled binary
+            "args": [],  // Add any command-line arguments your program needs
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "lldb",  // Use "gdb" if you're using GDB instead of LLDB
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ]
+        }
+    ]
+}
