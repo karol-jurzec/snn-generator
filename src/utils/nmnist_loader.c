@@ -130,6 +130,93 @@ NMNISTDataset *load_nmnist_dataset(const char *data_dir, size_t max_samples, boo
     return dataset;
 }
 
+// Function to convert NMNIST events to discretized input
+float *convert_events_to_input(const NMNISTEvent *events, size_t num_events, int time_bins, int height, int width, unsigned int max_time) {
+    // Allocate a 3D array: [T][H][W]
+    size_t input_size = time_bins * height * width;
+    float *input = (float *)calloc(input_size, sizeof(float)); // Initialize to 0
+
+    unsigned int bin_size = max_time / time_bins;
+
+    // Populate the bins
+    for (size_t i = 0; i < num_events; i++) {
+        const NMNISTEvent *event = &events[i];
+
+        // Determine the time bin
+        int t = event->timestamp / bin_size;
+        if (t >= time_bins) continue; // Ignore events outside the time range
+
+        // Map (x, y) to the spatial dimensions
+        int x = event->x - 1; // Convert 1-based to 0-based indexing
+        int y = event->y - 1;
+        if (x < 0 || x >= width || y < 0 || y >= height) continue; // Ignore invalid coordinates
+
+        // Compute the flattened index
+        size_t index = (t * height * width) + (y * width) + x;
+
+        // Accumulate polarity (1 for ON spikes, -1 for OFF spikes)
+        input[index] += (event->polarity == 1) ? 1.0f : 0.0f;
+    }
+
+    return input; // Caller must free the memory
+}
+
+// Save a single 2D frame as a PGM image
+void save_frame_as_pgm(const char *filename, float *data, int height, int width) {
+    FILE *file = fopen(filename, "w");
+    if (!file) {
+        printf("Error: Could not open file %s for writing\n", filename);
+        return;
+    }
+
+    // Write PGM header
+    fprintf(file, "P2\n");
+    fprintf(file, "%d %d\n", width, height);
+    fprintf(file, "255\n");
+
+    // Normalize and write pixel data
+    float max_value = 0.0f;
+    for (int i = 0; i < height * width; i++) {
+        if (data[i] > max_value) max_value = data[i];
+    }
+
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            int index = y * width + x;
+            int value = (int)((data[index] / max_value) * 255); // Normalize to 0-255
+            fprintf(file, "%d ", value);
+        }
+        fprintf(file, "\n");
+    }
+
+    fclose(file);
+    printf("Saved frame to %s\n", filename);
+}
+
+// Generate and save temporal frames for a sample
+void visualize_sample_frames(const NMNISTSample *sample, const char *output_dir, int time_bins, int height, int width, unsigned int max_time) {
+    // Convert events to discretized input
+    float *discretized_input = convert_events_to_input(
+        sample->events, sample->num_events, time_bins, height, width, max_time);
+
+    // Create output directory if it doesn't exist
+    char mkdir_command[256];
+    snprintf(mkdir_command, sizeof(mkdir_command), "mkdir -p %s", output_dir);
+    system(mkdir_command);
+
+    // Save each time bin as a separate frame
+    for (int t = 0; t < time_bins; t++) {
+        char filename[256];
+        snprintf(filename, sizeof(filename), "%s/frame_%03d.pgm", output_dir, t);
+
+        // Extract the 2D frame for the current time bin
+        float *frame = &discretized_input[t * height * width];
+        save_frame_as_pgm(filename, frame, height, width);
+    }
+
+    free(discretized_input);
+}
+
 // Free the NMNIST dataset
 void free_nmnist_dataset(NMNISTDataset *dataset) {
     for (size_t i = 0; i < dataset->num_samples; i++) {

@@ -332,3 +332,51 @@ void nmnist_loader_test() {
     return;
 }
 
+void discretization_test() {
+    // Load the NMNIST dataset
+    NMNISTDataset *dataset = load_nmnist_dataset("/Users/karol/Desktop/karol/agh/praca-snn/N-MNIST/Train", 10, true);
+
+    // Visualize the first sample as temporal frames
+    if (dataset->num_samples > 0) {
+        visualize_sample_frames(&dataset->samples[0], "out/sample_0_frames", 16, 28, 28, 100000);
+        visualize_sample_frames(&dataset->samples[1], "out/sample_1_frames", 16, 28, 28, 100000);
+        visualize_sample_frames(&dataset->samples[2], "out/sample_2_frames", 16, 28, 28, 100000);
+        visualize_sample_frames(&dataset->samples[3], "out/sample_3_frames", 64, 28, 28, 100000);
+    }
+
+    // Free the dataset
+    free_nmnist_dataset(dataset);
+}
+
+void train_test() {
+    const char *network_config_path = "/Users/karol/Desktop/karol/agh/praca-snn/N-MNIST/Train";   
+    const char *dataset_path = "example_model.json";
+
+    // Load the network
+    printf("Loading network from %s...\n", dataset_path);
+    Network *network = initialize_network_from_file(dataset_path);
+    if (!network) {
+        printf("Error: Failed to load network.\n");
+        return;
+    }
+
+    // Load the NMNIST dataset
+    printf("Loading dataset from %s...\n", network_config_path);
+    NMNISTDataset *dataset = load_nmnist_dataset(network_config_path, 100, true); // Load up to 100 samples
+    if (!dataset) {
+        printf("Error: Failed to load dataset.\n");
+        free_network(network);
+        return;
+    }
+
+    // Train the network
+    printf("Training the network...\n");
+    train(network, dataset);
+
+    // Clean up
+    free_nmnist_dataset(dataset);
+    free_network(network);
+
+    printf("Training test completed successfully.\n");
+}
+

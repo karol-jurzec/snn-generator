@@ -15,5 +15,7 @@ void print_output();
 void generate_synthetic_input(float *input, size_t size);
 void print_output_spikes(float *output, size_t num_neurons);
 void nmnist_loader_test();
+void discretization_test();
+void train_test();
 
 #endif // TESTS_H

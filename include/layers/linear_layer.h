@@ -12,11 +12,19 @@ typedef struct {
     float *weights;          // Weight matrix
     float *biases;           // Bias vector
     float *output;           // Output vector
+
+    // Training-specific
+    float *weight_gradients; // Gradient of weights
+    float *bias_gradients;   // Gradient of biases
+    float *input_gradients;  // Gradient of input to propagate backward
+    float *input;            // Input buffer
 } LinearLayer;
 
 // Function declarations
 void linear_initialize(LinearLayer *layer, size_t in_features, size_t out_features);
 void linear_forward(void *self, float *input, size_t input_size);
+void linear_backward(void *self, float *gradients);
+void linear_update_weights(void *self, float learning_rate);
 void linear_free(LinearLayer *layer);
 
 #endif // LINEAR_LAYER_H

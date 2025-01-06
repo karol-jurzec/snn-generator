@@ -1,6 +1,9 @@
 {
     "files.associations": {
         "*.rmd": "markdown",
-        "network_loader.h": "c"
+        "network_loader.h": "c",
+        "layer_utils.h": "c",
+        "stdlib.h": "c",
+        "random": "c"
     }
 }

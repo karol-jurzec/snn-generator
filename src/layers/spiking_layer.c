@@ -5,6 +5,7 @@
 
 void spiking_initialize(SpikingLayer *layer, size_t num_neurons, ModelBase **neuron_models) {
     layer->base.forward = spiking_forward;
+    layer->base.backward = spiking_backward;
     layer->num_neurons = num_neurons;
     layer->neurons = (ModelBase **)malloc(num_neurons * sizeof(ModelBase *));
     layer->base.output = (float *)malloc(num_neurons * sizeof(float));
@@ -13,41 +14,42 @@ void spiking_initialize(SpikingLayer *layer, size_t num_neurons, ModelBase **neu
     for (size_t i = 0; i < num_neurons; i++) {
         layer->neurons[i] = neuron_models[i];
     }
+
+    layer->spike_gradients = (float *)malloc(num_neurons * sizeof(float));
+    layer->base.input_gradients = (float *)malloc(num_neurons * sizeof(float));
 }
 
 void spiking_forward(void *self, float *input, size_t input_size) {
-    printf("Performing Spiking Layer forward pass...\n");
-    SpikingLayer* layer = (SpikingLayer*)self;
-
-    for (size_t i = 0; i < input_size; i++) {
-        if (i >= layer->num_neurons) {
-            fprintf(stderr, "Error: input_size exceeds number of neurons\n");
-            return;
-        }
-
-        if (layer->neurons[i] == NULL) {
-            fprintf(stderr, "Error: neuron %lu is not initialized\n", i);
-            return;
-        }
-
-        //printf("Updating neuron %lu with input %f\n", i, input[i]);
-        layer->neurons[i]->update_neuron(layer->neurons[i], input[i]);
-
-        if (layer->neurons[i]->v >= layer->neurons[i]->v_threshold) {
-            layer->base.output[i] = 1.0f;
-            printf("Neuron %lu spiked!\n", i);
-        } else {
-            layer->base.output[i] = 0.0f;
-        }
+    printf("Input for spiking layer:\n");
+    for(int i = 0; i < 10; ++i) {
+        printf("input[%d] = %f\n", i, input[i]);
     }
 
-    printf("Neuron layer values: \n");
-    for(int i = 0; i < 10; ++i) {
-        printf("Neuron %d: %f\n", i, layer->neurons[i]->v);
+    //printf("Performing Spiking Layer forward pass...\n");
+    SpikingLayer* layer = (SpikingLayer*)self;
+
+    for (size_t i = 0; i < layer->num_neurons; i++) {
+        layer->neurons[i]->update_neuron(layer->neurons[i], input[i]);
+        layer->base.output[i] = (layer->neurons[i]->spiked == 1) ? 1.0f : 0.0f;
+    }
+
+}
+
+// Backward pass for Spiking Layer
+void spiking_backward(void *self, float *gradients) {
+    SpikingLayer *layer = (SpikingLayer *)self;
+
+    for (size_t i = 0; i < layer->num_neurons; i++) {
+        float membrane_potential = layer->neurons[i]->v;
+        float spike_grad = (1.0f - membrane_potential * membrane_potential); // Example: tanh derivative
+        layer->spike_gradients[i] = gradients[i] * spike_grad;
+
+        layer->base.input_gradients[i] = layer->spike_gradients[i];
     }
 }
 
 void spiking_free(SpikingLayer *layer) {
     free(layer->neurons);
-    free(layer->output_spikes);
+    free(layer->spike_gradients);
+    free(layer->base.input_gradients);
 }
