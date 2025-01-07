@@ -147,8 +147,8 @@ float *convert_events_to_input(const NMNISTEvent *events, size_t num_events, int
         if (t >= time_bins) continue; // Ignore events outside the time range
 
         // Map (x, y) to the spatial dimensions
+        int y = event-> y - 1; // Convert 1-based to 0-based indexing
         int x = event->x - 1; // Convert 1-based to 0-based indexing
-        int y = event->y - 1;
         if (x < 0 || x >= width || y < 0 || y >= height) continue; // Ignore invalid coordinates
 
         // Compute the flattened index

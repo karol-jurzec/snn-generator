@@ -338,10 +338,10 @@ void discretization_test() {
 
     // Visualize the first sample as temporal frames
     if (dataset->num_samples > 0) {
-        visualize_sample_frames(&dataset->samples[0], "out/sample_0_frames", 16, 28, 28, 100000);
-        visualize_sample_frames(&dataset->samples[1], "out/sample_1_frames", 16, 28, 28, 100000);
-        visualize_sample_frames(&dataset->samples[2], "out/sample_2_frames", 16, 28, 28, 100000);
-        visualize_sample_frames(&dataset->samples[3], "out/sample_3_frames", 64, 28, 28, 100000);
+        visualize_sample_frames(&dataset->samples[0], "out/sample_0_frames", 16, 34, 34, 100000);
+        visualize_sample_frames(&dataset->samples[1], "out/sample_1_frames", 16, 34, 34, 100000);
+        visualize_sample_frames(&dataset->samples[2], "out/sample_2_frames", 16, 34, 34, 100000);
+        visualize_sample_frames(&dataset->samples[3], "out/sample_3_frames", 16, 34, 34, 100000);
     }
 
     // Free the dataset
@@ -350,7 +350,7 @@ void discretization_test() {
 
 void train_test() {
     const char *network_config_path = "/Users/karol/Desktop/karol/agh/praca-snn/N-MNIST/Train";   
-    const char *dataset_path = "example_model.json";
+    const char *dataset_path = "torch_model.json";
 
     // Load the network
     printf("Loading network from %s...\n", dataset_path);

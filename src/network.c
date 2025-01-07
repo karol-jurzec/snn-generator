@@ -105,7 +105,7 @@ void compute_probabilities(float *spike_counts, size_t num_neurons, float *proba
 void train(Network *network, NMNISTDataset *dataset) {
     printf("Starting training...\n");
 
-    const int TIME_BINS = 16; // Example time bins for spike counting
+    const int TIME_BINS = 16; // Number of time bins for spike counting
 
     for (int epoch = 0; epoch < EPOCHS; epoch++) {
         float epoch_loss = 0.0f;
@@ -122,26 +122,29 @@ void train(Network *network, NMNISTDataset *dataset) {
                 // Convert events to input format
                 float *input = convert_events_to_input(
                     sample->events, sample->num_events, TIME_BINS, 28, 28, 100000);
+                size_t input_size_per_bin = 28 * 28;
 
-                //visualize_sample_frames(&dataset->samples[i], "out/sample__frames", 16, 28, 28, 100000);
-                size_t input_size = TIME_BINS * 28 * 28;
+                // Reset spike counts across the network for a new sample
+                for (size_t l = 0; l < network->num_layers; l++) {
+                    if (network->layers[l]->reset_spike_counts) {
+                        network->layers[l]->reset_spike_counts(network->layers[l]);
+                    }
+                }
 
-                // Forward pass
-                network->layers[0]->forward(network->layers[0], input, input_size);
-                for (size_t j = 1; j < network->num_layers; j++) {
-                    network->layers[j]->forward(network->layers[j], network->layers[j - 1]->output,
-                                                network->layers[j - 1]->output_size);
+                // Process each time bin sequentially
+                for (int t = 0; t < TIME_BINS; t++) {
+                    float *frame = &input[t * input_size_per_bin];
+
+                    // Forward pass for the current time bin
+                    network->layers[0]->forward(network->layers[0], frame, input_size_per_bin);
+                    for (size_t j = 1; j < network->num_layers; j++) {
+                        network->layers[j]->forward(network->layers[j], network->layers[j - 1]->output,
+                                                    network->layers[j - 1]->output_size);
+                    }
                 }
 
                 // Retrieve the last layer and validate it as a SpikingLayer
-                LayerBase *last_layer = network->layers[network->num_layers - 1];
-                if (last_layer == NULL || last_layer->forward == NULL) {
-                    fprintf(stderr, "Error: Output layer is NULL or not properly initialized.\n");
-                    free(input);
-                    continue;
-                }
-
-                SpikingLayer *output_layer = (SpikingLayer *)last_layer;
+                SpikingLayer *output_layer = (SpikingLayer *)network->layers[network->num_layers - 1];
                 if (output_layer->num_neurons == 0 || output_layer->neurons == NULL) {
                     fprintf(stderr, "Error: Output layer neurons are not properly initialized.\n");
                     free(input);
@@ -152,17 +155,12 @@ void train(Network *network, NMNISTDataset *dataset) {
                 float spike_counts[output_layer->num_neurons];
                 for (size_t n = 0; n < output_layer->num_neurons; n++) {
                     LIFNeuron *neuron = (LIFNeuron *)output_layer->neurons[n];
-                    spike_counts[n] = (float)neuron->spike_count; // Get spike count
+                    spike_counts[n] = (float)neuron->spike_count; // Get accumulated spike count
                 }
 
                 // Compute probabilities
                 float probabilities[output_layer->num_neurons];
                 compute_probabilities(spike_counts, output_layer->num_neurons, probabilities);
-
-                for (size_t n = 0; n < output_layer->num_neurons; n++) {
-                    printf("Neuron[%zu] Spike Count: %f, Probability: %f\n", n, spike_counts[n], probabilities[n]);
-                }
-
 
                 // Calculate loss (Cross-Entropy Loss)
                 int label = sample->label;
@@ -178,9 +176,6 @@ void train(Network *network, NMNISTDataset *dataset) {
                 for (size_t j = network->num_layers; j-- > 0;) {
                     LayerBase *layer = network->layers[j];
                     if (layer->backward) {
-                        // DebugV: Check output size before backward
-                        //printf("Backward pass for layer %zu: output_size = %d\n", j, layer->output_size);
-
                         layer->backward(layer, gradients);
 
                         // Resize gradients for the next layer
@@ -207,16 +202,9 @@ void train(Network *network, NMNISTDataset *dataset) {
                 }
 
                 free(gradients); // Free gradients array after backward pass
-
-                // Reset spike counts for the next sample
-                for (size_t n = 0; n < output_layer->num_neurons; n++) {
-                    LIFNeuron *neuron = (LIFNeuron *)output_layer->neurons[n];
-                    neuron->spike_count = 0;
-                }
-
-                free(input); // Free the converted input
+                free(input);     // Free the converted input
                 total_samples++;
-            }       
+            }
 
             // Update weights after processing the batch
             update_weights(network, LEARNING_RATE);
@@ -228,3 +216,4 @@ void train(Network *network, NMNISTDataset *dataset) {
 
     printf("Training complete!\n");
 }
+

@@ -7,7 +7,7 @@
 #include "../../include/layers/conv2d_layer.h"
 
 void conv2d_initialize(Conv2DLayer *layer, int in_channels, int out_channels, int kernel_size, int stride, int padding) {
-    size_t input_dim = 28;
+    size_t input_dim = 34;
 
     layer->base.forward = conv2d_forward;
     layer->base.backward = conv2d_backward;
@@ -44,11 +44,15 @@ void conv2d_forward(void *self, float *input, size_t input_size) {
     Conv2DLayer *layer = (Conv2DLayer *)self;
     size_t output_dim = calculate_output_dim(28, layer->kernel_size, layer->stride, layer->padding);
 
-    printf("conv2d input: \n");
+    //printf("conv2d input: \n");
 
-    for(int i = 0; i < input_size; ++i) {
-        printf("input[%d]: %f\n", i, input[i]);
-    }
+    //for(int i = 0; i < 28; ++i) {
+    //    printf("[ ");
+    //    for(int j = 0; j < 28; ++j) {
+    //        printf("%.1f ", input[i * 28 + j]);
+    //    }
+    //    printf("]\n");
+    //}
 
     layer->input = input;
 
@@ -61,8 +65,8 @@ void conv2d_forward(void *self, float *input, size_t input_size) {
                         for (int kx = 0; kx < layer->kernel_size; kx++) {
                             size_t ix = ox * layer->stride + kx - layer->padding;
                             size_t iy = oy * layer->stride + ky - layer->padding;
-                            if (ix < 28 && iy < 28) {
-                                size_t input_idx = (ic * input_size) + (iy * 28 + ix);
+                            if (ix < 34 && iy < 34) {
+                                size_t input_idx = (ic * input_size) + (iy * 34 + ix);
                                 size_t weight_idx = (((oc * layer->in_channels + ic) * layer->kernel_size + ky) * layer->kernel_size + kx);
                                 sum += input[input_idx] * layer->weights[weight_idx];
                             }
@@ -87,7 +91,7 @@ void conv2d_backward(void *self, float *gradients) {
     memset(layer->weight_gradients, 0, sizeof(float) * layer->in_channels * layer->out_channels * layer->kernel_size * layer->kernel_size);
     memset(layer->bias_gradients, 0, sizeof(float) * layer->out_channels);
 
-    size_t input_dim = 28;  // Assuming square input
+    size_t input_dim = 34;  // Assuming square input
     size_t output_dim = calculate_output_dim(input_dim, layer->kernel_size, layer->stride, layer->padding);
 
     // Allocate memory for input gradients

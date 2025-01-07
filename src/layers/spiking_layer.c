@@ -2,10 +2,12 @@
 #include <stdio.h>
 
 #include "../../include/layers/spiking_layer.h"
+#include "../../include/models/lif_neuron.h"
 
 void spiking_initialize(SpikingLayer *layer, size_t num_neurons, ModelBase **neuron_models) {
     layer->base.forward = spiking_forward;
     layer->base.backward = spiking_backward;
+    layer->base.reset_spike_counts = spiking_reset_spike_counts;
     layer->num_neurons = num_neurons;
     layer->neurons = (ModelBase **)malloc(num_neurons * sizeof(ModelBase *));
     layer->base.output = (float *)malloc(num_neurons * sizeof(float));
@@ -45,6 +47,14 @@ void spiking_backward(void *self, float *gradients) {
         layer->spike_gradients[i] = gradients[i] * spike_grad;
 
         layer->base.input_gradients[i] = layer->spike_gradients[i];
+    }
+}
+
+void spiking_reset_spike_counts(void *self) {
+    SpikingLayer *layer = (SpikingLayer *)self;
+    for (size_t i = 0; i < layer->num_neurons; i++) {
+        LIFNeuron *neuron = (LIFNeuron *)layer->neurons[i];
+        neuron->spike_count = 0;
     }
 }
 

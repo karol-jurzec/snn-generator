@@ -55,7 +55,7 @@ int main(int argc, char *argv[]) {
     discretization_test();
    */
 
-  train_test();
+   train_test();
 
 
 

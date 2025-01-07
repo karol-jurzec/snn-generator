@@ -11,7 +11,7 @@ void maxpool2d_initialize(MaxPool2DLayer *layer, int kernel_size, int stride, in
     layer->stride = stride;
     layer->padding = padding;
 
-    size_t input_dim = 28;
+    size_t input_dim = 34;
     size_t output_dim = calculate_output_dim(input_dim, kernel_size, stride, padding);
 
     layer->max_indices = NULL;
