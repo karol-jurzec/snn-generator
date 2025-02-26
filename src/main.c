@@ -52,10 +52,10 @@ int main(int argc, char *argv[]) {
     network_test();
     network_loader_test();
     nmnist_loader_test();
-    discretization_test();
    */
 
    train_test();
+   // discretization_test();
 
 
 

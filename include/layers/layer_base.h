@@ -17,6 +17,12 @@ typedef struct {
     RESET_SPIKE_COUNTS_FUNC(reset_spike_counts);  // Reset spike counts function pointer for spiking layers
     float *output;                // Output buffer for layers
     float *input_gradients;       // Input gradients for backpropagation
+    
+    float *weight_gradients; // Gradient of weights
+    float *bias_gradients;   // Gradient of biases
+
+    float *weights;
+    int num_weights;
     int output_size;
 } LayerBase;
 

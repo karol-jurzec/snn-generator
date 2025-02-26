@@ -12,6 +12,8 @@
 #define EPOCHS 10
 #define BATCH_SIZE 16
 
+#define ENABLE_DEBUG_LOG
+
 
 // Create a new network with a given number of layers
 Network *create_network(size_t num_layers) {
@@ -102,10 +104,54 @@ void compute_probabilities(float *spike_counts, size_t num_neurons, float *proba
     }
 }
 
+void log_weights(Network *network, int epoch) {
+    char filename[50];
+    snprintf(filename, sizeof(filename), "out/weights/weights_epoch_%d.txt", epoch); // Create file per epoch
+
+    FILE *file = fopen(filename, "w");
+    if (!file) {
+        fprintf(stderr, "Error opening weight log file!\n");
+        return;
+    }
+
+    fprintf(file, "Epoch %d\n", epoch);
+    for (size_t l = 0; l < network->num_layers; l++) {
+        LayerBase *layer = network->layers[l];
+        if (layer->weights && layer->num_weights > 0) {
+            fprintf(file, "Layer %zu\n", l);
+            for (size_t w = 0; w < layer->num_weights; w++) {
+                fprintf(file, "%f\n", layer->weights[w]);
+            }
+        }
+    }
+    fclose(file);
+}
+
+void log_gradients(Network *network, int epoch) {
+    char filename[50];
+    snprintf(filename, sizeof(filename), "out/weight_grads/gradients_epoch_%d.txt", epoch);
+
+    FILE *file = fopen(filename, "w");
+    if (!file) return;
+
+    fprintf(file, "Epoch %d\n", epoch);
+    for (size_t l = 0; l < network->num_layers; l++) {
+        LayerBase *layer = network->layers[l];
+        if (layer->weight_gradients && layer->num_weights > 0) {
+            fprintf(file, "Layer %zu\n", l);
+            for (size_t w = 0; w < layer->num_weights; w++) {
+                fprintf(file, "%f\n", layer->weight_gradients[w]);
+            }
+        }
+    }
+    fclose(file);
+}
+
+
 void train(Network *network, NMNISTDataset *dataset) {
     printf("Starting training...\n");
 
-    const int TIME_BINS = 16; // Number of time bins for spike counting
+    const int TIME_BINS = 16; 
 
     for (int epoch = 0; epoch < EPOCHS; epoch++) {
         float epoch_loss = 0.0f;
@@ -212,8 +258,24 @@ void train(Network *network, NMNISTDataset *dataset) {
 
         // Print epoch summary
         printf("Epoch %d/%d, Loss: %.4f\n", epoch + 1, EPOCHS, epoch_loss / total_samples);
+        
+
+        /* logging weights and biasess to out/ directory
+            for insight into data 
+        */
+
+        #ifdef ENABLE_DEBUG_LOG
+
+        log_weights(network, epoch + 1);
+        log_gradients(network, epoch + 1);
+
+        #endif
     }
 
     printf("Training complete!\n");
 }
+
+// gradient clipping
+// weight and biases
+// quemu
 

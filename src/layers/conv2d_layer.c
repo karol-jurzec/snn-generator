@@ -7,7 +7,7 @@
 #include "../../include/layers/conv2d_layer.h"
 
 void conv2d_initialize(Conv2DLayer *layer, int in_channels, int out_channels, int kernel_size, int stride, int padding) {
-    size_t input_dim = 34;
+    size_t input_dim = 28;
 
     layer->base.forward = conv2d_forward;
     layer->base.backward = conv2d_backward;
@@ -24,18 +24,19 @@ void conv2d_initialize(Conv2DLayer *layer, int in_channels, int out_channels, in
     layer->padding = padding;
 
     size_t weight_size = in_channels * out_channels * kernel_size * kernel_size;
-    layer->weights = (float *)malloc(weight_size * sizeof(float));
+    layer->base.weights = (float *)malloc(weight_size * sizeof(float));
+    layer->base.num_weights = weight_size;
     layer->biases = (float *)malloc(out_channels * sizeof(float));
 
     for (size_t i = 0; i < weight_size; i++) {
-        layer->weights[i] = ((float)rand() / RAND_MAX) * 0.1f;
+        layer->base.weights[i] = ((float)rand() / RAND_MAX) * 0.1f;
     }
     for (size_t i = 0; i < out_channels; i++) {
         layer->biases[i] = 0.0f;
     }
 
-    layer->weight_gradients = (float *)malloc(weight_size * sizeof(float));
-    layer->bias_gradients = (float *)malloc(out_channels * sizeof(float));
+    layer->base.weight_gradients = (float *)malloc(weight_size * sizeof(float));
+    layer->base.bias_gradients = (float *)malloc(out_channels * sizeof(float));
     layer->base.input_gradients = NULL;
     layer->input = NULL;
 }
@@ -43,16 +44,6 @@ void conv2d_initialize(Conv2DLayer *layer, int in_channels, int out_channels, in
 void conv2d_forward(void *self, float *input, size_t input_size) {
     Conv2DLayer *layer = (Conv2DLayer *)self;
     size_t output_dim = calculate_output_dim(28, layer->kernel_size, layer->stride, layer->padding);
-
-    //printf("conv2d input: \n");
-
-    //for(int i = 0; i < 28; ++i) {
-    //    printf("[ ");
-    //    for(int j = 0; j < 28; ++j) {
-    //        printf("%.1f ", input[i * 28 + j]);
-    //    }
-    //    printf("]\n");
-    //}
 
     layer->input = input;
 
@@ -68,7 +59,7 @@ void conv2d_forward(void *self, float *input, size_t input_size) {
                             if (ix < 34 && iy < 34) {
                                 size_t input_idx = (ic * input_size) + (iy * 34 + ix);
                                 size_t weight_idx = (((oc * layer->in_channels + ic) * layer->kernel_size + ky) * layer->kernel_size + kx);
-                                sum += input[input_idx] * layer->weights[weight_idx];
+                                sum += input[input_idx] * layer->base.weights[weight_idx];
                             }
                         }
                     }
@@ -83,13 +74,8 @@ void conv2d_forward(void *self, float *input, size_t input_size) {
 void conv2d_backward(void *self, float *gradients) {
     Conv2DLayer *layer = (Conv2DLayer *)self;
 
-    printf("Backward pass for Conv2D Layer:\n");
-    for (size_t i = 0; i < 10; i++) { // Print the first 10 gradients for debugging
-        printf("Gradient[%zu]: %f\n", i, gradients[i]);
-    }
-
-    memset(layer->weight_gradients, 0, sizeof(float) * layer->in_channels * layer->out_channels * layer->kernel_size * layer->kernel_size);
-    memset(layer->bias_gradients, 0, sizeof(float) * layer->out_channels);
+    memset(layer->base.weight_gradients, 0, sizeof(float) * layer->in_channels * layer->out_channels * layer->kernel_size * layer->kernel_size);
+    memset(layer->base.bias_gradients, 0, sizeof(float) * layer->out_channels);
 
     size_t input_dim = 34;  // Assuming square input
     size_t output_dim = calculate_output_dim(input_dim, layer->kernel_size, layer->stride, layer->padding);
@@ -107,7 +93,7 @@ void conv2d_backward(void *self, float *gradients) {
                 float grad = gradients[(oc * output_dim * output_dim) + (oy * output_dim + ox)];
 
                 // Bias gradients
-                layer->bias_gradients[oc] += grad;
+                layer->base.bias_gradients[oc] += grad;
 
                 for (int ic = 0; ic < layer->in_channels; ic++) {
                     for (int ky = 0; ky < layer->kernel_size; ky++) {
@@ -120,10 +106,10 @@ void conv2d_backward(void *self, float *gradients) {
                                 size_t input_idx = (ic * input_dim * input_dim) + (iy * input_dim + ix);
 
                                 // Weight gradients
-                                layer->weight_gradients[weight_idx] += grad * layer->input[input_idx];
+                                layer->base.weight_gradients[weight_idx] += grad * layer->input[input_idx];
 
                                 // Input gradients
-                                layer->base.input_gradients[input_idx] += grad * layer->weights[weight_idx];
+                                layer->base.input_gradients[input_idx] += grad * layer->base.weights[weight_idx];
                             }
                         }
                     }
@@ -137,25 +123,20 @@ void conv2d_update_weights(void *self, float learning_rate) {
     Conv2DLayer *layer = (Conv2DLayer *)self;
 
     printf("Updating weights for Conv2D Layer:\n");
-    for (size_t i = 0; i < 10; i++) { // Print the first 10 weights for debugging
-        printf("Weight[%zu]: %f -> ", i, layer->weights[i]);
-        layer->weights[i] -= learning_rate * layer->weight_gradients[i];
-        printf("%f\n", layer->weights[i]);
-    }
 
     for (size_t i = 0; i < layer->out_channels; i++) {
-        printf("Bias[%zu]: %f -> ", i, layer->biases[i]);
-        layer->biases[i] -= learning_rate * layer->bias_gradients[i];
-        printf("%f\n", layer->biases[i]);
+        //printf("Bias[%zu]: %f -> ", i, layer->biases[i]);
+        layer->biases[i] -= learning_rate * layer->base.bias_gradients[i];
+        //printf("%f\n", layer->biases[i]);
     }
 }
 
 
 void conv2d_free(Conv2DLayer *layer) {
-    free(layer->weights);
+    free(layer->base.weights);
     free(layer->biases);
-    free(layer->weight_gradients);
-    free(layer->bias_gradients);
+    free(layer->base.weight_gradients);
+    free(layer->base.bias_gradients);
     free(layer->base.input_gradients);
     free(layer->base.output);
 }

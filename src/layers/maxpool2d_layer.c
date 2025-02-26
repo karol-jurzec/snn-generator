@@ -11,7 +11,7 @@ void maxpool2d_initialize(MaxPool2DLayer *layer, int kernel_size, int stride, in
     layer->stride = stride;
     layer->padding = padding;
 
-    size_t input_dim = 34;
+    size_t input_dim = 28;
     size_t output_dim = calculate_output_dim(input_dim, kernel_size, stride, padding);
 
     layer->max_indices = NULL;
@@ -27,18 +27,9 @@ void maxpool2d_initialize(MaxPool2DLayer *layer, int kernel_size, int stride, in
 void maxpool2d_forward(void *self, float *input, size_t input_size) {
     MaxPool2DLayer *layer = (MaxPool2DLayer *)self;
 
-    printf("Maxpool2d input: \n");
-
-    for(int i = 0; i < 10; i++) {
-        if(input[i] > 0) {
-            printf("input[%d] = %f\n", i, input[i]);
-        }
-    }
-
-    size_t input_dim = (size_t)sqrt(input_size); // Assuming square input
+    size_t input_dim = (size_t)sqrt(input_size); 
     size_t output_dim = (input_dim - layer->kernel_size) / layer->stride + 1;
 
-    // Reallocate memory for output and max_indices
     layer->base.output = (float *)realloc(layer->base.output, output_dim * output_dim * sizeof(float));
     layer->max_indices = (size_t *)realloc(layer->max_indices, output_dim * output_dim * sizeof(size_t));
 
@@ -49,7 +40,7 @@ void maxpool2d_forward(void *self, float *input, size_t input_size) {
 
     for (size_t oy = 0; oy < output_dim; oy++) {
         for (size_t ox = 0; ox < output_dim; ox++) {
-            float max_val = -INFINITY; // Smallest possible value
+            float max_val = -INFINITY; // smallest possible value
             size_t max_idx = 0;
 
             for (size_t ky = 0; ky < layer->kernel_size; ky++) {

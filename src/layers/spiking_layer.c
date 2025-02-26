@@ -22,10 +22,11 @@ void spiking_initialize(SpikingLayer *layer, size_t num_neurons, ModelBase **neu
 }
 
 void spiking_forward(void *self, float *input, size_t input_size) {
-    printf("Input for spiking layer:\n");
-    for(int i = 0; i < 10; ++i) {
-        printf("input[%d] = %f\n", i, input[i]);
-    }
+    //printf("Input for spiking layer:\n");
+
+    //for(int i = 0; i < 10; ++i) {
+    //    printf("input[%d] = %f\n", i, input[i]);
+    //}
 
     //printf("Performing Spiking Layer forward pass...\n");
     SpikingLayer* layer = (SpikingLayer*)self;

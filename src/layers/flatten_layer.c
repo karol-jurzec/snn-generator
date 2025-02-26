@@ -6,6 +6,7 @@
 
 void flatten_initialize(FlattenLayer *layer, size_t input_size) {
     layer->base.forward = flatten_forward;
+    layer->base.backward = flatten_backward;
     layer->base.output_size = input_size;  // Output size matches input size (flattening does not change total number of elements)
     layer->base.output = (float *)malloc(layer->base.output_size * sizeof(float));
     layer->base.input_gradients = (float *)malloc(input_size * sizeof(float));
