@@ -5,9 +5,11 @@
 #include "../../include/models/lif_neuron.h"
 
 void spiking_initialize(SpikingLayer *layer, size_t num_neurons, ModelBase **neuron_models) {
+    layer->base.is_spiking = true;
     layer->base.forward = spiking_forward;
     layer->base.backward = spiking_backward;
     layer->base.reset_spike_counts = spiking_reset_spike_counts;
+    layer->base.num_inputs= num_neurons;
     layer->num_neurons = num_neurons;
     layer->neurons = (ModelBase **)malloc(num_neurons * sizeof(ModelBase *));
     layer->base.output = (float *)malloc(num_neurons * sizeof(float));
@@ -30,6 +32,7 @@ void spiking_forward(void *self, float *input, size_t input_size) {
 
     //printf("Performing Spiking Layer forward pass...\n");
     SpikingLayer* layer = (SpikingLayer*)self;
+    layer->base.inputs = input;
 
     for (size_t i = 0; i < layer->num_neurons; i++) {
         layer->neurons[i]->update_neuron(layer->neurons[i], input[i]);
@@ -39,7 +42,7 @@ void spiking_forward(void *self, float *input, size_t input_size) {
 }
 
 // Backward pass for Spiking Layer
-void spiking_backward(void *self, float *gradients) {
+float* spiking_backward(void *self, float *gradients) {
     SpikingLayer *layer = (SpikingLayer *)self;
 
     for (size_t i = 0; i < layer->num_neurons; i++) {
@@ -49,6 +52,8 @@ void spiking_backward(void *self, float *gradients) {
 
         layer->base.input_gradients[i] = layer->spike_gradients[i];
     }
+
+    return layer->base.input_gradients;
 }
 
 void spiking_reset_spike_counts(void *self) {

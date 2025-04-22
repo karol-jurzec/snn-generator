@@ -17,9 +17,9 @@ void free_network(Network *network);
 float calculate_loss(float *output, int label, size_t output_size);
 void update_weights(Network *network, float learning_rate);
 void train(Network *network, NMNISTDataset *dataset);
+void zero_grads(Network* model);
 void compute_probabilities(float *spike_counts, size_t num_neurons, float *probabilities);
-void log_weights(Network *network, int epoch);
-void log_gradients(Network *network, int epoch);
+
 
 
 

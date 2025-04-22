@@ -1,6 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
+#include <math.h>
 
 #include "../include/tests.h"
 #include "../include/network.h"
@@ -94,7 +96,7 @@ void conv2d_test() {
 
     // Initialize Conv2D layer
     Conv2DLayer conv_layer;
-    conv2d_initialize(&conv_layer, in_channels, out_channels, kernel_size, stride, padding);
+    conv2d_initialize(&conv_layer, in_channels, out_channels, kernel_size, stride, padding, 28);
 
     // Perform forward pass
     conv2d_forward(&conv_layer, input, input_size);
@@ -125,7 +127,7 @@ void maxpool2d_test() {
     }
 
     MaxPool2DLayer pool_layer;
-    maxpool2d_initialize(&pool_layer, kernel_size, stride, padding);
+    maxpool2d_initialize(&pool_layer, kernel_size, stride, padding, 28, 2);
     maxpool2d_forward(&pool_layer, input, input_size); 
 
     size_t output_dim = calculate_output_dim(input_dim, kernel_size, stride, padding);
@@ -229,12 +231,12 @@ void network_test() {
 
     // Initialize and add Conv2D layer
     Conv2DLayer *conv_layer = (Conv2DLayer *)malloc(sizeof(Conv2DLayer));
-    conv2d_initialize(conv_layer, 2, 12, 5, 1, 0);
+    conv2d_initialize(conv_layer, 2, 12, 5, 1, 0, 24);
     add_layer(network, (LayerBase *)conv_layer, 0);
 
     // Initialize and add MaxPool2D layer
     MaxPool2DLayer *pool_layer = (MaxPool2DLayer *)malloc(sizeof(MaxPool2DLayer));
-    maxpool2d_initialize(pool_layer, 2, 2, 0);
+    maxpool2d_initialize(pool_layer, 2, 2, 0, 28, 2);
     add_layer(network, (LayerBase *)pool_layer, 1);
 
     // Initialize and add Flatten layer
@@ -321,8 +323,12 @@ void nmnist_loader_test() {
 
     // Display information for each loaded sample
     for (size_t i = 0; i < 10; i++) {
-        printf("\nSample %zu:\n", i + 1);
-        print_sample(&dataset->samples[i], 10); // Display up to 10 events per sample
+        //printf("\nSample %zu:\n", i + 1);
+        if(&dataset->samples[i].label != 0) {
+            visualize_sample_frames(&dataset->samples[i], "out/sample_01_frames", 16, 28, 28, 100000);
+            break;
+        }
+        //print_sample(&dataset->samples[i], 10); // Display up to 10 events per sample
     }
 
     // Free the dataset
@@ -334,11 +340,21 @@ void nmnist_loader_test() {
 
 void discretization_test() {
     // Load the NMNIST dataset
-    NMNISTDataset *dataset = load_nmnist_dataset("/Users/karol/Desktop/karol/agh/praca-snn/N-MNIST/Train", 10, true);
+    //NMNISTDataset *dataset = load_nmnist_dataset("/Users/karol/Desktop/karol/agh/praca-snn/N-MNIST/Train", 10, true);
 
+    NMNISTSample sample = load_nmnist_sample(
+    "/Users/karol/Desktop/karol/agh/praca-snn/N-MNIST/Train/5/00333.bin",
+    4, false);
+
+    int max_time = sample.events[sample.num_events - 1].timestamp;
+
+    //NMNISTSample sample = load_nmnist_sample(file_path, digit, stabilize);
+    visualize_sample_frames(&sample, "out/sample_0_frames", 311, 34, 34, max_time);
+    plot_event_grid(&sample, 2, 3, 0);
+    
+    /*
     // Visualize the first sample as temporal frames
     if (dataset->num_samples > 0) {
-        visualize_sample_frames(&dataset->samples[0], "out/sample_0_frames", 16, 34, 34, 100000);
         visualize_sample_frames(&dataset->samples[1], "out/sample_1_frames", 16, 34, 34, 100000);
         visualize_sample_frames(&dataset->samples[2], "out/sample_2_frames", 16, 34, 34, 100000);
         visualize_sample_frames(&dataset->samples[3], "out/sample_3_frames", 16, 34, 34, 100000);
@@ -346,7 +362,9 @@ void discretization_test() {
 
     // Free the dataset
     free_nmnist_dataset(dataset);
+    */
 }
+
 
 void train_test() {
     const char *network_config_path = "/Users/karol/Desktop/karol/agh/praca-snn/N-MNIST/Train";   
@@ -380,3 +398,166 @@ void train_test() {
     printf("Training test completed successfully.\n");
 }
 
+// Simple synthetic data generator
+float* generate_batch(int batch_size, int features, int* labels) {
+    float* data = malloc(batch_size * features * sizeof(float));
+    for (int i = 0; i < batch_size; i++) {
+        float sum = 0;
+        for (int j = 0; j < features; j++) {
+            data[i * features + j] = (float)rand() / RAND_MAX;
+            sum += data[i * features + j];
+        }
+        labels[i] = (sum / features) > 0.5f ? 1 : 0;
+    }
+    return data;
+}
+
+// Layer creation functions implementation
+Conv2DLayer* create_conv2d_layer(int height, int width, int in_channels, int out_channels, 
+                               int kernel_size, int stride, int padding) {
+    Conv2DLayer *layer = (Conv2DLayer*)malloc(sizeof(Conv2DLayer));
+    conv2d_initialize(layer, in_channels, out_channels, kernel_size, stride, padding, height);
+    return layer;
+}
+
+MaxPool2DLayer* create_maxpool_layer(int height, int width, int channels, 
+                                   int pool_size, int stride) {
+    MaxPool2DLayer *layer = (MaxPool2DLayer*)malloc(sizeof(MaxPool2DLayer));
+    maxpool2d_initialize(layer, pool_size, stride, 0, height, channels);
+    return layer;
+}
+
+FlattenLayer* create_flatten_layer(size_t input_size) {
+    FlattenLayer *layer = (FlattenLayer*)malloc(sizeof(FlattenLayer));
+    flatten_initialize(layer, input_size);
+    return layer;
+}
+
+LinearLayer* create_linear_layer(size_t in_features, size_t out_features) {
+    LinearLayer *layer = (LinearLayer*)malloc(sizeof(LinearLayer));
+    linear_initialize(layer, in_features, out_features);
+    return layer;
+}
+
+SpikingLayer* create_spiking_layer(size_t num_neurons) {
+    SpikingLayer *layer = (SpikingLayer*)malloc(sizeof(SpikingLayer));
+    // Using LIF neurons as default
+    ModelBase **neurons = (ModelBase**)malloc(num_neurons * sizeof(ModelBase*));
+    for (size_t i = 0; i < num_neurons; i++) {
+        neurons[i] = (ModelBase*)malloc(sizeof(LIFNeuron));
+        // Initialize LIF neuron here
+
+        lif_initialize((LIFNeuron *)neurons[i], 0.0f, 0.5f, 0.0f, 0.5f);
+    }
+    spiking_initialize(layer, num_neurons, neurons);
+    return layer;
+}
+
+void test_network_training() {
+    srand((unsigned int)time(NULL));  // Added cast
+    
+    // Parameters
+    const int epochs = 10;
+    const int batch_size = 32;
+    const int num_samples = 1000;
+    const int features = 34 * 34;
+    const float learning_rate = 0.01f;
+    
+    // Initialize network
+    Network network;
+    network.num_layers = 5;  // Set based on how many layers you'll add
+    network.layers = malloc(network.num_layers * sizeof(LayerBase*));
+    
+    // Add layers using your existing functions
+    add_layer(&network, (LayerBase*)create_conv2d_layer(34, 34, 1, 8, 3, 1, 1), 0);
+    add_layer(&network, (LayerBase*)create_maxpool_layer(32, 32, 8, 2, 2), 1);
+    add_layer(&network, (LayerBase*)create_flatten_layer(16 * 16 * 8), 2);
+    add_layer(&network, (LayerBase*)create_linear_layer(16 * 16 * 8, 10), 3);
+    add_layer(&network, (LayerBase*)create_spiking_layer(10), 4);
+    
+    printf("Starting training...\n");
+    
+    for (int epoch = 0; epoch < epochs; epoch++) {
+        float epoch_loss = 0.0;
+        int correct = 0;
+        
+        for (int batch_start = 0; batch_start < num_samples; batch_start += batch_size) {
+            int actual_batch_size = (batch_start + batch_size > num_samples) ? 
+                                    num_samples - batch_start : batch_size;
+            
+            // Generate batch
+            int labels[actual_batch_size];
+            float* inputs = generate_batch(actual_batch_size, features, labels);
+            
+            // Batch processing
+            zero_grads(&network);
+            
+            for (int i = 0; i < actual_batch_size; i++) {
+                // Reset spike counts if needed
+                for (size_t l = 0; l < network.num_layers; l++) {
+                    if (network.layers[l]->reset_spike_counts) {
+                        network.layers[l]->reset_spike_counts(network.layers[l]);
+                    }
+                }
+                
+                // Forward pass
+                const int time_bins = 10;
+                for (int t = 0; t < time_bins; t++) {
+                    float* input = &inputs[i * features];
+                    
+                    network.layers[0]->forward(network.layers[0], input, features);
+                    for (size_t j = 1; j < network.num_layers; j++) {
+                        LayerBase* prev_layer = network.layers[j-1];
+                        network.layers[j]->forward(network.layers[j], prev_layer->output, 
+                                                  prev_layer->output_size);
+                    }
+                }
+                
+                // Get output spike counts
+                SpikingLayer* output_layer = (SpikingLayer*)network.layers[network.num_layers-1];
+                float spike_counts[output_layer->num_neurons];
+                for (size_t n = 0; n < output_layer->num_neurons; n++) {
+                    LIFNeuron* neuron = (LIFNeuron*)output_layer->neurons[n];
+                    spike_counts[n] = (float)neuron->spike_count;
+                }
+                
+                // Compute probabilities
+                float probabilities[output_layer->num_neurons];
+                compute_probabilities(spike_counts, output_layer->num_neurons, probabilities);
+                
+                // Calculate loss and accuracy
+                int label = labels[i];
+                epoch_loss += -logf(probabilities[label] + 1e-10f);
+                if (fabsf(probabilities[label] - 1.0f) < 0.5f) correct++;
+                
+                // Backward pass
+                float* gradients = malloc(output_layer->num_neurons * sizeof(float));
+                for (size_t k = 0; k < output_layer->num_neurons; k++) {
+                    gradients[k] = probabilities[k] - (k == label ? 1.0f : 0.0f);
+                }
+                
+                for (size_t j = network.num_layers; j-- > 0;) {
+                    gradients = network.layers[j]->backward(network.layers[j], gradients);
+                }
+                
+                //free(gradients);
+            }
+            
+            // Update weights
+            update_weights(&network, learning_rate);
+            free(inputs);
+        }
+        
+        // Epoch statistics
+        float accuracy = (float)correct / num_samples * 100.0f;
+        printf("Epoch %d/%d - Loss: %.4f, Accuracy: %.2f%%\n", 
+               epoch+1, epochs, epoch_loss/num_samples, accuracy);
+    }
+    
+    // Cleanup
+    for (size_t i = 0; i < network.num_layers; i++) {
+        free(network.layers[i]);
+    }
+    free(network.layers);
+    printf("Training complete!\n");
+}

@@ -5,6 +5,7 @@
 
 #include "../include/network.h"
 #include "../include/utils/nmnist_loader.h"
+#include "../include/utils/network_logger.h"
 #include "../include/models/lif_neuron.h"
 #include "../include/layers/spiking_layer.h"
 
@@ -102,75 +103,47 @@ void compute_probabilities(float *spike_counts, size_t num_neurons, float *proba
     for (size_t i = 0; i < num_neurons; i++) {
         probabilities[i] /= sum_exp;
     }
+
+   
 }
 
-void log_weights(Network *network, int epoch) {
-    char filename[50];
-    snprintf(filename, sizeof(filename), "out/weights/weights_epoch_%d.txt", epoch); // Create file per epoch
-
-    FILE *file = fopen(filename, "w");
-    if (!file) {
-        fprintf(stderr, "Error opening weight log file!\n");
-        return;
-    }
-
-    fprintf(file, "Epoch %d\n", epoch);
-    for (size_t l = 0; l < network->num_layers; l++) {
-        LayerBase *layer = network->layers[l];
-        if (layer->weights && layer->num_weights > 0) {
-            fprintf(file, "Layer %zu\n", l);
-            for (size_t w = 0; w < layer->num_weights; w++) {
-                fprintf(file, "%f\n", layer->weights[w]);
-            }
+void zero_grads(Network* model) {
+    for (size_t i = 0; i < model->num_layers; i++) {
+        if(model->layers[i]->zero_grad != NULL) {
+            model->layers[i]->zero_grad(model->layers[i]);
         }
     }
-    fclose(file);
 }
-
-void log_gradients(Network *network, int epoch) {
-    char filename[50];
-    snprintf(filename, sizeof(filename), "out/weight_grads/gradients_epoch_%d.txt", epoch);
-
-    FILE *file = fopen(filename, "w");
-    if (!file) return;
-
-    fprintf(file, "Epoch %d\n", epoch);
-    for (size_t l = 0; l < network->num_layers; l++) {
-        LayerBase *layer = network->layers[l];
-        if (layer->weight_gradients && layer->num_weights > 0) {
-            fprintf(file, "Layer %zu\n", l);
-            for (size_t w = 0; w < layer->num_weights; w++) {
-                fprintf(file, "%f\n", layer->weight_gradients[w]);
-            }
-        }
-    }
-    fclose(file);
-}
-
 
 void train(Network *network, NMNISTDataset *dataset) {
     printf("Starting training...\n");
 
-    const int TIME_BINS = 16; 
+    const int TIME_BINS = 311; 
 
     for (int epoch = 0; epoch < EPOCHS; epoch++) {
-        float epoch_loss = 0.0f;
+        float epoch_loss = 0.0;
         size_t total_samples = 0;
+
+        //log_gradients(network, 0, 0);
+        //log_weights(network, 0, 0);
 
         for (size_t batch_start = 0; batch_start < dataset->num_samples; batch_start += BATCH_SIZE) {
             size_t batch_end = batch_start + BATCH_SIZE;
             if (batch_end > dataset->num_samples) batch_end = dataset->num_samples;
+
+            zero_grads(network);
 
             // Batch processing
             for (size_t i = batch_start; i < batch_end; i++) {
                 NMNISTSample *sample = &dataset->samples[i];
 
                 // Convert events to input format
+                int max_time = sample->events[sample->num_events - 1].timestamp;
                 float *input = convert_events_to_input(
-                    sample->events, sample->num_events, TIME_BINS, 28, 28, 100000);
-                size_t input_size_per_bin = 28 * 28;
+                    sample->events, sample->num_events, TIME_BINS, 34, 34, max_time);
 
-                // Reset spike counts across the network for a new sample
+                size_t input_size_per_bin = 34 * 34; //to do -- probably one channel
+
                 for (size_t l = 0; l < network->num_layers; l++) {
                     if (network->layers[l]->reset_spike_counts) {
                         network->layers[l]->reset_spike_counts(network->layers[l]);
@@ -187,6 +160,10 @@ void train(Network *network, NMNISTDataset *dataset) {
                         network->layers[j]->forward(network->layers[j], network->layers[j - 1]->output,
                                                     network->layers[j - 1]->output_size);
                     }
+
+                    //log_inputs(network, epoch + 1, total_samples, t);
+                    log_spikes(network, epoch + 1, total_samples, t);
+                    //log_membranes(network, epoch + 1, total_samples, t);
                 }
 
                 // Retrieve the last layer and validate it as a SpikingLayer
@@ -205,6 +182,7 @@ void train(Network *network, NMNISTDataset *dataset) {
                 }
 
                 // Compute probabilities
+
                 float probabilities[output_layer->num_neurons];
                 compute_probabilities(spike_counts, output_layer->num_neurons, probabilities);
 
@@ -221,39 +199,27 @@ void train(Network *network, NMNISTDataset *dataset) {
 
                 for (size_t j = network->num_layers; j-- > 0;) {
                     LayerBase *layer = network->layers[j];
-                    if (layer->backward) {
-                        layer->backward(layer, gradients);
+                    gradients = layer->backward(layer, gradients);
 
-                        // Resize gradients for the next layer
-                        size_t next_grad_size = layer->input_gradients
-                                                    ? layer->output_size
-                                                    : output_layer->num_neurons;
-                        float *new_gradients = (float *)malloc(next_grad_size * sizeof(float));
-                        if (new_gradients) {
-                            if (layer->input_gradients) {
-                                memcpy(new_gradients, layer->input_gradients, next_grad_size * sizeof(float));
-                            } else {
-                                memset(new_gradients, 0, next_grad_size * sizeof(float));
-                                fprintf(stderr, "Warning: layer->input_gradients is NULL, initializing new_gradients to zero.\n");
-                            }
-
-                            free(gradients);
-                            gradients = new_gradients;
-                        } else {
-                            fprintf(stderr, "Error: Memory allocation failed for new_gradients.\n");
-                            free(gradients);
-                            break;
-                        }
-                    }
                 }
 
-                free(gradients); // Free gradients array after backward pass
+                log_gradients(network, 0, total_samples);
+
+                //free(gradients); // Free gradients array after backward pass
                 free(input);     // Free the converted input
                 total_samples++;
             }
 
+            #ifdef ENABLE_DEBUG_LOG
+
+            log_weights(network, epoch + 1, batch_start);
+            //log_gradients(network, epoch + 1, batch_start);
+
+            #endif
+
             // Update weights after processing the batch
             update_weights(network, LEARNING_RATE);
+
         }
 
         // Print epoch summary
@@ -266,8 +232,8 @@ void train(Network *network, NMNISTDataset *dataset) {
 
         #ifdef ENABLE_DEBUG_LOG
 
-        log_weights(network, epoch + 1);
-        log_gradients(network, epoch + 1);
+        //log_weights(network, epoch + 1);
+        //log_gradients(network, epoch + 1);
 
         #endif
     }
@@ -275,7 +241,4 @@ void train(Network *network, NMNISTDataset *dataset) {
     printf("Training complete!\n");
 }
 
-// gradient clipping
-// weight and biases
-// quemu
 

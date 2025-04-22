@@ -15,8 +15,7 @@
             "spike_grad": "atan",
             "neuron_type": "Leaky",
             "init_hidden": true,
-            "output": false,
-            "num_neurons": 6912
+            "output": false
         },
         {
             "type": "MaxPool2d",
@@ -37,8 +36,7 @@
             "spike_grad": "atan",
             "neuron_type": "Leaky",
             "init_hidden": true,
-            "output": false,
-            "num_neurons": 2048
+            "output": false
         },
         {
             "type": "MaxPool2d",
@@ -58,8 +56,7 @@
             "neuron_type":"Leaky",
             "spike_grad": "atan",
             "init_hidden": true,
-            "output": true,
-            "num_neurons" : 10
+            "output": true
         }
     ]
 }

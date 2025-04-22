@@ -27,11 +27,17 @@ typedef struct {
 
 // Function declarations
 NMNISTDataset *load_nmnist_dataset(const char *data_dir, size_t max_samples, bool stabilize);
+NMNISTSample load_nmnist_sample(const char *file_path, int label, bool stabilize);
 void free_nmnist_dataset(NMNISTDataset *dataset);
 float *convert_events_to_input(const NMNISTEvent *events, size_t num_events, int time_bins, int height, int width, unsigned int max_time);
 
 void save_frame_as_pgm(const char *filename, float *data, int height, int width);
+void save_frame_as_image(const char *filename, float *data, int height, int width, int is_png);
 void visualize_sample_frames(const NMNISTSample *sample, const char *output_dir, int time_bins, int height, int width, unsigned int max_time);
+void print_frame(float* data, int width, int height);
+void plot_event_grid(NMNISTSample* events, int axis_x, int axis_y, int plot_frame_number);
+unsigned char max_value(NMNISTEvent* events, int num_events, char field);
+
 
 
 

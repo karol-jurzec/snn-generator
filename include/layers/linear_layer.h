@@ -21,10 +21,13 @@ typedef struct {
 } LinearLayer;
 
 // Function declarations
+void he_kaiming_uniform_init_linear(float *weights, size_t size, int fan_in);
+
 void linear_initialize(LinearLayer *layer, size_t in_features, size_t out_features);
 void linear_forward(void *self, float *input, size_t input_size);
-void linear_backward(void *self, float *gradients);
+float* linear_backward(void *self, float *gradients);
 void linear_update_weights(void *self, float learning_rate);
 void linear_free(LinearLayer *layer);
+void linear_zero_grad(void *self);
 
 #endif // LINEAR_LAYER_H

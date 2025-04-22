@@ -17,5 +17,6 @@ void print_output_spikes(float *output, size_t num_neurons);
 void nmnist_loader_test();
 void discretization_test();
 void train_test();
+void test_network_training();
 
 #endif // TESTS_H

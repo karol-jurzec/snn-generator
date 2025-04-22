@@ -16,7 +16,8 @@ typedef struct {
 // Function declarations
 void flatten_initialize(FlattenLayer *layer, size_t input_size);
 void flatten_forward(void *self, float *input, size_t input_size);
-void flatten_backward(void *self, float *gradients); // Simply reshapes gradients back
+float* flatten_backward(void *self, float *gradients); // Simply reshapes gradients back
 void flatten_free(FlattenLayer *layer);
+void flatten_zero_grad(void *self);
 
 #endif // FLATTEN_LAYER_H

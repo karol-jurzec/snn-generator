@@ -54,9 +54,10 @@ int main(int argc, char *argv[]) {
     nmnist_loader_test();
    */
 
-   train_test();
-   // discretization_test();
-
+//nmnist_loader_test();
+    //train_test();
+    //discretization_test();
+    test_network_training();
 
 
 

@@ -6,6 +6,7 @@
 
 typedef struct {
     LayerBase base;          // Inherits LayerBase for polymorphic forward
+    int input_dim;           // Input dim, assuming that the input is square
     int in_channels;         // Number of input channels
     int out_channels;        // Number of output channels
     int kernel_size;         // Kernel dimensions (assuming square kernels)
@@ -23,10 +24,14 @@ typedef struct {
     float *input;
 } Conv2DLayer;
 
-void conv2d_initialize(Conv2DLayer *layer, int in_channels, int out_channels, int kernel_size, int stride, int padding);
+void he_kaiming_uniform_init(float *weights, size_t size, int in_channels, int kernel_size);
+
+void conv2d_initialize(Conv2DLayer *layer, int in_channels, int out_channels, int kernel_size, int stride, int padding, int input_dim);
 void conv2d_forward(void *self, float *input, size_t input_size);
-void conv2d_backward(void *self, float *gradients);
+float* conv2d_backward(void *self, float *gradients);
 void conv2d_update_weights(void *self, float learning_rate);
 void conv2d_free(Conv2DLayer *layer);
+void conv2d_zero_grad(void *self);
+
 
 #endif // CONV2D_LAYER_H

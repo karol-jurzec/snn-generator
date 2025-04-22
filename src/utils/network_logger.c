@@ -1,0 +1,138 @@
+#include "../../include/utils/network_logger.h"
+#include "../../include/layers/spiking_layer.h"
+
+void log_weights(Network *network, int epoch, int batch) {
+    char filename[50];
+    snprintf(filename, sizeof(filename), "out/weights/weights_epoch_%d_batch_%d.txt", epoch, batch);
+
+    FILE *file = fopen(filename, "w");
+    if (!file) {
+        fprintf(stderr, "Error opening weight log file!\n");
+        return;
+    }
+
+    fprintf(file, "Epoch %d\n", epoch);
+    for (size_t l = 0; l < network->num_layers; l++) {
+        LayerBase *layer = network->layers[l];
+        if (layer->weights && layer->num_weights > 0) {
+            fprintf(file, "Layer %zu\n", l);
+            for (size_t w = 0; w < layer->num_weights; w++) {
+                fprintf(file, "%f\n", layer->weights[w]);
+            }
+        }
+    }
+    fclose(file);
+}
+
+void log_gradients(Network *network, int epoch, int sample) {
+    char filename[50];
+    snprintf(filename, sizeof(filename), "out/weight_grads/gradients_epoch_%d_sample_%d.txt", epoch, sample);
+
+    FILE *file = fopen(filename, "w");
+    if (!file) return;
+
+    fprintf(file, "Epoch %d\n", epoch);
+    for (size_t l = 0; l < network->num_layers; l++) {
+        LayerBase *layer = network->layers[l];
+        if (layer->weight_gradients && layer->num_weights > 0) {
+            fprintf(file, "Layer %zu\n", l);
+            for (size_t w = 0; w < layer->num_weights; w++) {
+                fprintf(file, "%f\n", layer->weight_gradients[w]);
+            }
+        }
+    }
+    fclose(file);
+}
+
+void log_inputs(Network *network, int epoch, int sample, int t) {
+    char filename[50];
+    snprintf(filename, sizeof(filename), "out/inputs/inputs_epoch_%d_sample_%d_t_%d.txt", epoch, sample, t);
+
+    FILE *file = fopen(filename, "w");
+    if (!file) return;
+
+    fprintf(file, "Epoch %d, Sample %d, Time %d\n", epoch, sample, t);
+    for (size_t l = 0; l < network->num_layers; l++) {
+        LayerBase *layer = network->layers[l];
+        if (layer->inputs && layer->num_inputs > 0) {
+            fprintf(file, "Layer %zu\n", l);
+            for (size_t i = 0; i < layer->num_inputs; i++) {
+                fprintf(file, "%f\n", layer->inputs[i]);
+            }
+        }
+    }
+    fclose(file);
+}
+
+
+// 3 spiking layers 
+
+// 16 time steps - x axis
+// num_neurpons - y axis 
+
+void create_directory(const char *path) {
+    struct stat st = {0};
+    if (stat(path, &st) == -1) {
+        mkdir(path, 0700);
+    }
+}
+
+void log_membranes(Network *network, int epoch, int sample, int t) {
+    char base_path[100];
+    snprintf(base_path, sizeof(base_path), "out/membrane_values/sample_%02d_epoch_%02d", sample, epoch);
+    create_directory("out/membrane_values");
+    create_directory(base_path);
+
+    for (size_t l = 0; l < network->num_layers; l++) {
+        LayerBase *layer = network->layers[l];
+        if (layer->is_spiking && layer->inputs && layer->num_inputs > 0) {
+            char layer_path[120];
+            snprintf(layer_path, sizeof(layer_path), "%s/layer_%02zu", base_path, l);
+            create_directory(layer_path);
+
+            char filename[140];
+            snprintf(filename, sizeof(filename), "%s/t_%02d.txt", layer_path, t);
+            FILE *file = fopen(filename, "w");
+            if (!file) continue;
+
+            fprintf(file, "Epoch %d, Sample %d, Time %d\n", epoch, sample, t);
+            fprintf(file, "Layer %zu\n", l);
+
+            SpikingLayer *spiking_layer = (SpikingLayer *)layer;
+            for (size_t i = 0; i < spiking_layer->num_neurons; i++) {
+                fprintf(file, "%f\n", spiking_layer->neurons[i]->v);
+            }
+            fclose(file);
+        }
+    }
+
+
+}
+
+void log_spikes(Network *network, int epoch, int sample, int t) {
+    char base_path[100];
+    snprintf(base_path, sizeof(base_path), "out/spikes_outputs/sample_%02d_epoch_%02d", sample, epoch);
+    create_directory("out/spikes_outputs");
+    create_directory(base_path);
+
+    for (size_t l = 0; l < network->num_layers; l++) {
+        LayerBase *layer = network->layers[l];
+        if (layer->is_spiking && layer->inputs && layer->num_inputs > 0) {
+            char layer_path[120];
+            snprintf(layer_path, sizeof(layer_path), "%s/layer_%02zu", base_path, l);
+            create_directory(layer_path);
+
+            char filename[140];
+            snprintf(filename, sizeof(filename), "%s/t_%02d.txt", layer_path, t);
+            FILE *file = fopen(filename, "w");
+            if (!file) continue;
+
+            fprintf(file, "Epoch %d, Sample %d, Time %d\n", epoch, sample, t);
+            fprintf(file, "Layer %zu\n", l);
+            for (size_t i = 0; i < layer->num_inputs; i++) {
+                fprintf(file, "%f\n", layer->output[i]);
+            }
+            fclose(file);
+        }
+    }
+}

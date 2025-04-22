@@ -5,13 +5,18 @@
             "name": "Debug snn_generator",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/snn_generator",  // Path to your compiled binary
-            "args": [],  // Add any command-line arguments your program needs
+            "program": "${workspaceFolder}/snn_generator",
+            "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
-            "environment": [],
+            "environment": [
+                {
+                    "name": "PATH",
+                    "value": "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:${env:PATH}"
+                }
+            ],
             "externalConsole": false,
-            "MIMode": "lldb",  // Use "gdb" if you're using GDB instead of LLDB
+            "MIMode": "lldb",
             "setupCommands": [
                 {
                     "description": "Enable pretty-printing for gdb",

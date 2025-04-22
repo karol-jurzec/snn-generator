@@ -4,6 +4,10 @@
         "network_loader.h": "c",
         "layer_utils.h": "c",
         "stdlib.h": "c",
-        "random": "c"
+        "random": "c",
+        "stb_image_write.h": "c",
+        "string.h": "c",
+        "mse_count_loss.h": "c",
+        "nmnist_loader.h": "c"
     }
 }
