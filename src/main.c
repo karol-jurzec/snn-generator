@@ -51,9 +51,14 @@ int main(int argc, char *argv[]) {
     spiking_layer_test();
     network_test();
     network_loader_test();
+    nmnist_loader_test();
    */
 
-    nmnist_loader_test();
+//nmnist_loader_test();
+    //train_test();
+    //discretization_test();
+    test_network_training();
+
 
     return 0;
 }

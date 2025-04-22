@@ -9,6 +9,7 @@
 typedef struct {
     float v;                       // Membrane potential
     float v_threshold;
+    float spiked;                  // Spike flag
     MODEL_UPDATE_FUNC(update_neuron);  // Polymorphic update function
 } ModelBase;
 

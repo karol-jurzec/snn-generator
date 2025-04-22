@@ -1,8 +1,9 @@
 # Compiler and Flags
-CC = gcc
-CFLAGS = -Wall -Wextra -g -I$(INCLUDE_DIR) -I$(JSON_C_INCLUDE)
+CC = gcc  
+CFLAGS = -Wall -Wextra -g -I$(INCLUDE_DIR) -I$(JSON_C_INCLUDE) 
+
 LDFLAGS = -L$(JSON_C_LIB)
-LDLIBS = -ljson-c
+LDLIBS = -ljson-c -lpthread -lm
 
 # Directories
 SRC_DIR = src

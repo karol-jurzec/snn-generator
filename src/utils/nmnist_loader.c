@@ -3,9 +3,14 @@
 #include <string.h>
 #include <stdbool.h>
 #include <dirent.h>
+#include <stdint.h>
+
+
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+
+#include "../../include/utils/stb_image_write.h"
 #include "../../include/utils/nmnist_loader.h"
 
-// Helper to stabilize the dataset (motion compensation)
 static void stabilize_events(NMNISTEvent *events, size_t num_events) {
     for (size_t i = 0; i < num_events; i++) {
         unsigned int ts = events[i].timestamp;
@@ -27,12 +32,15 @@ static void stabilize_events(NMNISTEvent *events, size_t num_events) {
 }
 
 // Helper function to load a single NMNIST file
-static NMNISTSample load_nmnist_file(const char *file_path, int label, bool stabilize) {
+NMNISTSample load_nmnist_sample(const char *file_path, int label, bool stabilize) {
     FILE *file = fopen(file_path, "rb");
     if (!file) {
         printf("Error: Could not open file %s\n", file_path);
         exit(EXIT_FAILURE);
     }
+
+  //  int x = -1;
+  //  int y = -1;
 
     // Determine the number of events
     fseek(file, 0, SEEK_END);
@@ -56,7 +64,21 @@ static NMNISTSample load_nmnist_file(const char *file_path, int label, bool stab
         events[i].y = buffer[1];  // Y-address
         events[i].polarity = (buffer[2] >> 7) & 1;  // Polarity (MSB)
         events[i].timestamp = ((buffer[2] & 0x7F) << 16) | (buffer[3] << 8) | buffer[4];  // Timestamp
+
+
+        //if(x < events[i].x) {
+        //    x = events[i].x;
+        //}
+
+        //if(y < events[i].y) {
+        //    y = events[i].y;
+        //}
     }
+
+
+//    printf("Max x coord for that sample %d\n", x);
+//    printf("Max y coord for that sample %d\n\n", y);
+
 
     fclose(file);
 
@@ -110,7 +132,7 @@ NMNISTDataset *load_nmnist_dataset(const char *data_dir, size_t max_samples, boo
                 snprintf(file_path, sizeof(file_path), "%s/%s", digit_dir, entry->d_name);
 
                 // Load the NMNIST sample
-                NMNISTSample sample = load_nmnist_file(file_path, digit, stabilize);
+                NMNISTSample sample = load_nmnist_sample(file_path, digit, stabilize);
 
                 // Add to the dataset
                 if (dataset->num_samples < max_samples) {
@@ -128,6 +150,208 @@ NMNISTDataset *load_nmnist_dataset(const char *data_dir, size_t max_samples, boo
     }
 
     return dataset;
+}
+
+// Function to convert NMNIST events to discretized input
+float *convert_events_to_input(const NMNISTEvent *events, size_t num_events, int time_bins, int height, int width, unsigned int max_time) {
+    // Allocate a 4D array: [2 (ON/OFF)][T][H][W]
+    size_t input_size = 2 * time_bins * height * width; // 2 channels (ON/OFF)
+    float *input = (float *)calloc(input_size, sizeof(float)); // Initialize to 0
+    if (!input) {
+        fprintf(stderr, "Memory allocation failed\n");
+        return NULL;
+    }
+
+    unsigned int bin_size = max_time / time_bins;
+
+    // Populate the bins
+    for (size_t i = 0; i < num_events; i++) {
+        const NMNISTEvent *event = &events[i];
+
+        // Determine the time bin
+        int t = event->timestamp / bin_size;
+        if (t >= time_bins) continue; // Ignore events outside the time range
+
+        // Map (x, y) to the spatial dimensions (0-based indexing)
+        int y = event->y; 
+        int x = event->x; 
+        if (x < 0 || x >= width || y < 0 || y >= height) continue; 
+
+        // Determine the channel (0 for OFF, 1 for ON)
+        int c = event->polarity;  
+
+        // Compute the flattened index
+        // [C][T][X][Y]
+        size_t index = (c * time_bins * height * width) + (t * height * width) + (y * width) + x;
+
+        // Accumulate spikes in the appropriate channel
+        input[index] += 1.0f;
+    }
+
+    return input; // Caller must free the memory
+}
+
+void plot_event_grid(NMNISTSample *sample, int axis_x, int axis_y, int plot_frame_number) {
+    FILE *gnuplotPipe = popen("gnuplot -persistent", "w");
+    if (!gnuplotPipe) {
+        fprintf(stderr, "Error: Could not open gnuplot.\n");
+        return;
+    }
+
+    // Configure Gnuplot
+    fprintf(gnuplotPipe, "set multiplot layout %d,%d title 'Event Grid Heatmap'\n", axis_x, axis_y);
+    fprintf(gnuplotPipe, "unset key\n");
+    fprintf(gnuplotPipe, "set size ratio -1\n");  // Keep correct aspect ratio
+    fprintf(gnuplotPipe, "unset xtics\n");
+    fprintf(gnuplotPipe, "unset ytics\n");
+    fprintf(gnuplotPipe, "unset border\n");
+    fprintf(gnuplotPipe, "set xrange [0:33]\n");
+    fprintf(gnuplotPipe, "set yrange [33:0]\n");  // Flip Y-axis
+    fprintf(gnuplotPipe, "set palette rgbformulae 30,31,32\n");  // Better heatmap color
+    fprintf(gnuplotPipe, "set cbrange [0:*]\n");  // Auto color scaling based on event density
+
+    // Calculate the number of frames
+    int num_frames = axis_x * axis_y;
+    int events_per_frame = sample->num_events / num_frames;
+
+    for (int i = 0; i < num_frames; i++) {
+        fprintf(gnuplotPipe, "set title 'Frame %d'\n", i);
+        fprintf(gnuplotPipe, "plot '-' matrix with image\n");
+
+        // Create a 2D event grid (initialize with zeros)
+        int event_grid[34][34] = {0};
+
+        // Count events per (x, y) location
+        for (int j = 0; j < events_per_frame; j++) {
+            int index = i * events_per_frame + j;
+            if (index < sample->num_events) {
+                NMNISTEvent event = sample->events[index];
+                event_grid[event.y][event.x]++;  // Swap X/Y if needed
+            }
+        }
+
+        // Output the grid data in Gnuplot's matrix format
+        for (int y = 0; y < 34; y++) {
+            for (int x = 0; x < 34; x++) {
+                fprintf(gnuplotPipe, "%d ", event_grid[y][x]);
+            }
+            fprintf(gnuplotPipe, "\n");
+        }
+        fprintf(gnuplotPipe, "e\n");
+    }
+
+    fprintf(gnuplotPipe, "unset multiplot\n");
+    fflush(gnuplotPipe);
+    pclose(gnuplotPipe);
+}
+
+// Save a single 2D frame as a PGM image
+void save_frame_as_pgm(const char *filename, float *data, int height, int width) {
+    FILE *file = fopen(filename, "w");
+    if (!file) {
+        printf("Error: Could not open file %s for writing\n", filename);
+        return;
+    }
+
+    // Write PGM header
+    fprintf(file, "P2\n");
+    fprintf(file, "%d %d\n", width, height);
+    fprintf(file, "255\n");
+
+    // Normalize and write pixel data
+    float max_value = 0.0f;
+    for (int i = 0; i < height * width; i++) {
+        if (data[i] > max_value) max_value = data[i];
+    }
+
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            int index = y * width + x;
+            int value = (int)((data[index] / max_value) * 255); // Normalize to 0-255
+            fprintf(file, "%d ", value);
+        }
+        fprintf(file, "\n");
+    }
+
+    fclose(file);
+    printf("Saved frame to %s\n", filename);
+}
+
+// Save a single 2D frame as a PNG or JPG image
+void save_frame_as_image(const char *filename, float *data, int height, int width, int is_png) {
+    // Allocate memory for 8-bit grayscale image
+    uint8_t *image = (uint8_t *)malloc(height * width);
+    if (!image) {
+        printf("Error: Could not allocate memory for image\n");
+        return;
+    }
+
+    // Find the max value in data for normalization
+    float max_value = 0.0f;
+    for (int i = 0; i < height * width; i++) {
+        if (data[i] > max_value) max_value = data[i];
+    }
+
+    // Normalize and convert to 8-bit grayscale
+    for (int i = 0; i < height * width; i++) {
+        image[i] = (uint8_t)((data[i] / max_value) * 255);
+    }
+
+    // Save as PNG or JPG
+    int success;
+    if (is_png) {
+        success = stbi_write_png(filename, width, height, 1, image, width);
+    } else {
+        success = stbi_write_jpg(filename, width, height, 1, image, 90); // 90% quality for JPG
+    }
+
+    // Cleanup
+    free(image);
+
+    if (success) {
+        printf("Saved frame to %s\n", filename);
+    } else {
+        printf("Error: Could not save image %s\n", filename);
+    }
+}
+
+// Print a 28x28 array of floats with 1-digit precision
+void print_frame(float *data, int height, int width) {
+    if (height != 28 || width != 28) {
+        printf("Error: Expected a 28x28 frame, but got %dx%d\n", height, width);
+        return;
+    }
+
+    for (int y = 0; y < height; y++) {
+        for (int x = 0; x < width; x++) {
+            printf("%.1f ", data[y * width + x]);
+        }
+        printf("\n");
+    }
+}
+
+// Generate and save temporal frames for a sample
+void visualize_sample_frames(const NMNISTSample *sample, const char *output_dir, int time_bins, int height, int width, unsigned int max_time) {
+    // Convert events to discretized input
+    float *discretized_input = convert_events_to_input(
+        sample->events, sample->num_events, time_bins, height, width, max_time);
+
+    // Create output directory if it doesn't exist
+    char mkdir_command[256];
+    snprintf(mkdir_command, sizeof(mkdir_command), "mkdir -p %s", output_dir);
+    system(mkdir_command);
+
+    // Save each time bin as a separate frame
+    for (int t = 0; t < time_bins; t++) {
+        char filename[256];
+        snprintf(filename, sizeof(filename), "%s/frame_%03d.pgm", output_dir, t);
+
+        // Extract the 2D frame for the current time bin
+        float *frame = &discretized_input[t * height * width];
+        save_frame_as_pgm(filename, frame, height, width);
+    }
+
+    free(discretized_input);
 }
 
 // Free the NMNIST dataset
