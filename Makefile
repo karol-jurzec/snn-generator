@@ -8,9 +8,12 @@ LDLIBS = -ljson-c
 SRC_DIR = src
 INCLUDE_DIR = include
 BUILD_DIR = build
-JSON_C_PREFIX = $(shell brew --prefix json-c)
-JSON_C_INCLUDE = $(JSON_C_PREFIX)/include
-JSON_C_LIB = $(JSON_C_PREFIX)/lib
+#JSON_C_PREFIX = $(shell brew --prefix json-c)
+JSON_C_INCLUDE = /mingw64/include
+JSON_C_LIB = /mingw64/lib
+
+#JSON_C_INCLUDE = $(JSON_C_PREFIX)/include
+#JSON_C_LIB = $(JSON_C_PREFIX)/lib
 
 # Source Files and Object Files
 SRC_FILES = $(wildcard $(SRC_DIR)/**/*.c $(SRC_DIR)/*.c)

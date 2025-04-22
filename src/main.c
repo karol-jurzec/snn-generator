@@ -55,6 +55,5 @@ int main(int argc, char *argv[]) {
 
     nmnist_loader_test();
 
-
     return 0;
 }

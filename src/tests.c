@@ -297,7 +297,9 @@ void print_sample(const NMNISTSample *sample, size_t max_events_to_display) {
 
 void nmnist_loader_test() {
     // Directory containing the NMNIST dataset
-    const char *dataset_dir = "/Users/karol/Desktop/karol/agh/praca-snn/N-MNIST/Train";   
+    // const char *dataset_dir = "/Users/karol/Desktop/karol/agh/praca-snn/N-MNIST/Train";   
+    const char *dataset_dir = "C:/Users/karol/Documents/datasets/N-MNIST/Test";   
+
 
     // Maximum number of samples to load for testing
     size_t max_samples_to_load = 10000;

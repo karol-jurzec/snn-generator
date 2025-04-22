@@ -5,13 +5,22 @@
             "name": "Debug snn_generator",
             "type": "cppdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/snn_generator",  // Path to your compiled binary
-            "args": [],  // Add any command-line arguments your program needs
+            "program": "${workspaceFolder}/snn_generator.exe",
+            "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
-            "environment": [],
-            "externalConsole": false,
-            "MIMode": "lldb",  // Use "gdb" if you're using GDB instead of LLDB
+            "environment": [
+                {
+                    "name": "PATH",
+                    "value": "C:/msys64/ucrt64/bin;C:/msys64/usr/bin;${env:PATH}"
+                }
+            ],
+            "externalConsole": true,
+            "MIMode": "gdb",
+            "miDebuggerPath": "C:/msys64/ucrt64/bin/gdb.exe",
+            "logging": {
+                "engineLogging": true
+            },
             "setupCommands": [
                 {
                     "description": "Enable pretty-printing for gdb",

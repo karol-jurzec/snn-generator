@@ -1,6 +1,7 @@
 {
     "files.associations": {
         "*.rmd": "markdown",
-        "network_loader.h": "c"
+        "network_loader.h": "c",
+        "lif_neuron.h": "c"
     }
 }
