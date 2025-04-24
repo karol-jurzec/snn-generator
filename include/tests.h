@@ -19,4 +19,8 @@ void discretization_test();
 void train_test();
 void test_network_training();
 
+void iris_classification_example(); // fully connected network 
+void prototype_classification_example();
+
+
 #endif // TESTS_H

@@ -19,6 +19,7 @@ void linear_initialize(LinearLayer *layer, size_t in_features, size_t out_featur
     layer->base.forward = linear_forward;
     layer->base.backward = linear_backward;
     layer->base.zero_grad = linear_zero_grad;  // Assign function pointer
+    layer->base.update_weights = linear_update_weights;
     layer->base.num_inputs = in_features;
     layer->in_features = in_features;
     layer->out_features = out_features;

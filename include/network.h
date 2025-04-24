@@ -5,7 +5,12 @@
 #include "layers/layer_base.h"
 #include "utils/nmnist_loader.h"
 
+#define NETWORK_FORWARD_FUNC(name) void (*name)(void *self, float *input, size_t input_size)
+
 typedef struct {
+    NETWORK_FORWARD_FUNC(forward);  // Forward function pointer for layers
+
+
     LayerBase **layers;   // Array of pointers to layers (polymorphic)
     size_t num_layers;    // Number of layers in the network
 } Network;

@@ -13,6 +13,7 @@
 #include "../include/utils/snn_plot.h"
 #include "../include/utils/layer_utils.h"
 #include "../include/utils/network_loader.h"
+#include "../include/utils/network_logger.h"
 #include "../include/utils/nmnist_loader.h"
 
 #include "../include/layers/conv2d_layer.h"
@@ -455,111 +456,580 @@ SpikingLayer* create_spiking_layer(size_t num_neurons) {
     return layer;
 }
 
-void test_network_training() {
-    srand((unsigned int)time(NULL));  // Added cast
+// Iris dataset parameters
+#define MAX_LINE_LENGTH 100
+#define NUM_FEATURES 4
+#define NUM_CLASSES 3
+#define NUM_SAMPLES 150
+#define TRAIN_SIZE 120  // 80% of 150
+#define TEST_SIZE 30    // 20% of 150
+
+typedef struct {
+    float sepal_length;
+    float sepal_width;
+    float petal_length;
+    float petal_width;
+    int variety;  // 0=Setosa, 1=Versicolor, 2=Virginica
+} IrisSample;
+
+void parse_iris_line(char *line, IrisSample *sample) {
+    char *token;
+    int col = 0;
     
-    // Parameters
-    const int epochs = 10;
-    const int batch_size = 32;
-    const int num_samples = 1000;
-    const int features = 34 * 34;
-    const float learning_rate = 0.01f;
+    // Remove newline if present
+    line[strcspn(line, "\n")] = 0;
+    
+    token = strtok(line, ",");
+    while (token != NULL && col < 5) {
+        // Remove quotes if present
+        if (token[0] == '"') {
+            memmove(token, token+1, strlen(token));  // Remove opening quote
+            token[strlen(token)-1] = '\0';           // Remove closing quote
+        }
+        
+        switch(col) {
+            case 0:  // sepal.length
+                sample->sepal_length = atof(token);
+                break;
+            case 1:  // sepal.width
+                sample->sepal_width = atof(token);
+                break;
+            case 2:  // petal.length
+                sample->petal_length = atof(token);
+                break;
+            case 3:  // petal.width
+                sample->petal_width = atof(token);
+                break;
+            case 4:  // variety
+                if (strcmp(token, "\"Setosa\"") == 0 || strcmp(token, "Setosa") == 0)
+                    sample->variety = 0;
+                else if (strcmp(token, "\"Versicolor\"") == 0 || strcmp(token, "Versicolor") == 0)
+                    sample->variety = 1;
+                else if (strcmp(token, "\"Virginica\"") == 0 || strcmp(token, "Virginica") == 0)
+                    sample->variety = 2;
+                break;
+        }
+        
+        token = strtok(NULL, ",");
+        col++;
+    }
+}
+
+void calculate_mean_std(IrisSample *samples, int count, float *means, float *stds) {
+    // Initialize sums and squares
+    float sums[NUM_FEATURES] = {0};
+    float squares[NUM_FEATURES] = {0};
+    
+    // Calculate sums
+    for (int i = 0; i < count; i++) {
+        sums[0] += samples[i].sepal_length;
+        sums[1] += samples[i].sepal_width;
+        sums[2] += samples[i].petal_length;
+        sums[3] += samples[i].petal_width;
+        
+        squares[0] += samples[i].sepal_length * samples[i].sepal_length;
+        squares[1] += samples[i].sepal_width * samples[i].sepal_width;
+        squares[2] += samples[i].petal_length * samples[i].petal_length;
+        squares[3] += samples[i].petal_width * samples[i].petal_width;
+    }
+    
+    // Calculate means and standard deviations
+    for (int i = 0; i < NUM_FEATURES; i++) {
+        means[i] = sums[i] / count;
+        stds[i] = sqrt((squares[i] / count) - (means[i] * means[i]));
+    }
+}
+
+void standardize_features(IrisSample *samples, int count, float *means, float *stds) {
+    for (int i = 0; i < count; i++) {
+        samples[i].sepal_length = (samples[i].sepal_length - means[0]) / stds[0];
+        samples[i].sepal_width = (samples[i].sepal_width - means[1]) / stds[1];
+        samples[i].petal_length = (samples[i].petal_length - means[2]) / stds[2];
+        samples[i].petal_width = (samples[i].petal_width - means[3]) / stds[3];
+    }
+}
+
+void load_iris_dataset(const char *filename, 
+                      float X_train[TRAIN_SIZE][NUM_FEATURES], int y_train[TRAIN_SIZE],
+                      float X_test[TEST_SIZE][NUM_FEATURES], int y_test[TEST_SIZE]) {
+    FILE *file = fopen(filename, "r");
+    if (file == NULL) {
+        perror("Error opening file");
+        exit(EXIT_FAILURE);
+    }
+    
+    IrisSample samples[NUM_SAMPLES];
+    char line[MAX_LINE_LENGTH];
+    int index = 0;
+    
+    // Skip header line
+    fgets(line, sizeof(line), file);
+    
+    // Read all samples
+    while (fgets(line, sizeof(line), file) != NULL && index < NUM_SAMPLES) {
+        parse_iris_line(line, &samples[index]);
+        index++;
+    }
+    fclose(file);
+    
+    // Calculate mean and std for standardization
+    float means[NUM_FEATURES], stds[NUM_FEATURES];
+    calculate_mean_std(samples, NUM_SAMPLES, means, stds);
+    
+    // Standardize features (like StandardScaler)
+    standardize_features(samples, NUM_SAMPLES, means, stds);
+    
+    // Shuffle samples (for proper train/test split)
+    for (int i = NUM_SAMPLES - 1; i > 0; i--) {
+        int j = rand() % (i + 1);
+        IrisSample temp = samples[i];
+        samples[i] = samples[j];
+        samples[j] = temp;
+    }
+    
+    // Split into train and test sets (80/20)
+    for (int i = 0; i < TRAIN_SIZE; i++) {
+        X_train[i][0] = samples[i].sepal_length;
+        X_train[i][1] = samples[i].sepal_width;
+        X_train[i][2] = samples[i].petal_length;
+        X_train[i][3] = samples[i].petal_width;
+        y_train[i] = samples[i].variety;
+    }
+    
+    for (int i = 0; i < TEST_SIZE; i++) {
+        X_test[i][0] = samples[TRAIN_SIZE + i].sepal_length;
+        X_test[i][1] = samples[TRAIN_SIZE + i].sepal_width;
+        X_test[i][2] = samples[TRAIN_SIZE + i].petal_length;
+        X_test[i][3] = samples[TRAIN_SIZE + i].petal_width;
+        y_test[i] = samples[TRAIN_SIZE + i].variety;
+    }
+}
+
+// ReLU activation function
+void relu_forward(float *input, size_t size) {
+    for (size_t i = 0; i < size; i++) {
+        input[i] = input[i] > 0 ? input[i] : 0;
+    }
+}
+
+// Softmax function
+void softmax(float *input, size_t size) {
+    float max_val = input[0];
+    for (size_t i = 1; i < size; i++) {
+        if (input[i] > max_val) {
+            max_val = input[i];
+        }
+    }
+    
+    float sum = 0.0f;
+    for (size_t i = 0; i < size; i++) {
+        input[i] = expf(input[i] - max_val);
+        sum += input[i];
+    }
+    
+    for (size_t i = 0; i < size; i++) {
+        input[i] /= sum;
+    }
+}
+
+// Cross-entropy loss
+float cross_entropy_loss(float *probabilities, int true_class, size_t num_classes) {
+    // Ensure we don't take log of zero
+    float prob = probabilities[true_class] < 1e-10 ? 1e-10 : probabilities[true_class];
+    return -logf(prob);
+}
+
+// Calculate accuracy
+float calculate_accuracy(int *predicted, int *true_labels, size_t size) {
+    int correct = 0;
+    for (size_t i = 0; i < size; i++) {
+        if (predicted[i] == true_labels[i]) {
+            correct++;
+        }
+    }
+    return (float)correct / size;
+}
+
+// Helper function to shuffle the dataset
+void shuffle_data(float X[][NUM_FEATURES], int y[], int size, int num_features) {
+    for (int i = size - 1; i > 0; i--) {
+        int j = rand() % (i + 1);
+        
+        // Swap features
+        float temp_features[num_features];
+        memcpy(temp_features, X[i], num_features * sizeof(float));
+        memcpy(X[i], X[j], num_features * sizeof(float));
+        memcpy(X[j], temp_features, num_features * sizeof(float));
+        
+        // Swap labels
+        int temp_label = y[i];
+        y[i] = y[j];
+        y[j] = temp_label;
+    }
+}
+
+void iris_classification_example() {
+    srand(42);  // For reproducibility
+    
+    // Load dataset
+    float X_train[TRAIN_SIZE][NUM_FEATURES];
+    int y_train[TRAIN_SIZE];
+    float X_test[TEST_SIZE][NUM_FEATURES];
+    int y_test[TEST_SIZE];
+    
+    load_iris_dataset("C:/Users/karol/Desktop/karol/agh/praca_snn/iris.csv", X_train, y_train, X_test, y_test);
     
     // Initialize network
     Network network;
-    network.num_layers = 5;  // Set based on how many layers you'll add
+    network.num_layers = 2;  // Linear(4,16) -> ReLU -> Linear(16,3)
     network.layers = malloc(network.num_layers * sizeof(LayerBase*));
     
-    // Add layers using your existing functions
-    add_layer(&network, (LayerBase*)create_conv2d_layer(34, 34, 1, 8, 3, 1, 1), 0);
-    add_layer(&network, (LayerBase*)create_maxpool_layer(32, 32, 8, 2, 2), 1);
-    add_layer(&network, (LayerBase*)create_flatten_layer(16 * 16 * 8), 2);
-    add_layer(&network, (LayerBase*)create_linear_layer(16 * 16 * 8, 10), 3);
-    add_layer(&network, (LayerBase*)create_spiking_layer(10), 4);
+    // Create layers
+    add_layer(&network, (LayerBase*)create_linear_layer(NUM_FEATURES, 16), 0);
+    add_layer(&network, (LayerBase*)create_linear_layer(16, NUM_CLASSES), 1);
+    
+    // Training parameters
+    const int epochs = 50;
+    const float learning_rate = 0.02f;
     
     printf("Starting training...\n");
     
+    // Buffers for intermediate activations
+    float hidden_activations[16];  // Output of first linear layer
+    float output_activations[NUM_CLASSES];  // Final output
+    
     for (int epoch = 0; epoch < epochs; epoch++) {
-        float epoch_loss = 0.0;
-        int correct = 0;
+        float epoch_loss = 0.0f;
+
+        int sample_num = 1;
         
-        for (int batch_start = 0; batch_start < num_samples; batch_start += batch_size) {
-            int actual_batch_size = (batch_start + batch_size > num_samples) ? 
-                                    num_samples - batch_start : batch_size;
-            
-            // Generate batch
-            int labels[actual_batch_size];
-            float* inputs = generate_batch(actual_batch_size, features, labels);
-            
-            // Batch processing
+        // Training loop
+        for (int i = 0; i < TRAIN_SIZE; i++) {
+            // Zero gradients
             zero_grads(&network);
             
-            for (int i = 0; i < actual_batch_size; i++) {
-                // Reset spike counts if needed
-                for (size_t l = 0; l < network.num_layers; l++) {
-                    if (network.layers[l]->reset_spike_counts) {
-                        network.layers[l]->reset_spike_counts(network.layers[l]);
-                    }
-                }
-                
-                // Forward pass
-                const int time_bins = 10;
-                for (int t = 0; t < time_bins; t++) {
-                    float* input = &inputs[i * features];
-                    
-                    network.layers[0]->forward(network.layers[0], input, features);
-                    for (size_t j = 1; j < network.num_layers; j++) {
-                        LayerBase* prev_layer = network.layers[j-1];
-                        network.layers[j]->forward(network.layers[j], prev_layer->output, 
-                                                  prev_layer->output_size);
-                    }
-                }
-                
-                // Get output spike counts
-                SpikingLayer* output_layer = (SpikingLayer*)network.layers[network.num_layers-1];
-                float spike_counts[output_layer->num_neurons];
-                for (size_t n = 0; n < output_layer->num_neurons; n++) {
-                    LIFNeuron* neuron = (LIFNeuron*)output_layer->neurons[n];
-                    spike_counts[n] = (float)neuron->spike_count;
-                }
-                
-                // Compute probabilities
-                float probabilities[output_layer->num_neurons];
-                compute_probabilities(spike_counts, output_layer->num_neurons, probabilities);
-                
-                // Calculate loss and accuracy
-                int label = labels[i];
-                epoch_loss += -logf(probabilities[label] + 1e-10f);
-                if (fabsf(probabilities[label] - 1.0f) < 0.5f) correct++;
-                
-                // Backward pass
-                float* gradients = malloc(output_layer->num_neurons * sizeof(float));
-                for (size_t k = 0; k < output_layer->num_neurons; k++) {
-                    gradients[k] = probabilities[k] - (k == label ? 1.0f : 0.0f);
-                }
-                
-                for (size_t j = network.num_layers; j-- > 0;) {
-                    gradients = network.layers[j]->backward(network.layers[j], gradients);
-                }
-                
-                //free(gradients);
+            // Forward pass
+            // First linear layer (4->16)
+            network.layers[0]->forward(network.layers[0], X_train[i], NUM_FEATURES);
+            //memcpy(hidden_activations, network.layers[0]->output, sizeof(float) * 16);
+            
+            // ReLU activation
+            relu_forward(network.layers[0]->output, 16);
+            
+            // Second linear layer (16->3)
+            network.layers[1]->forward(network.layers[1], network.layers[0]->output, 16);
+            //memcpy(output_activations, network.layers[1]->output, sizeof(float) * NUM_CLASSES);
+            
+            // Softmax (for loss calculation)
+            softmax(network.layers[1]->output, NUM_CLASSES);
+            
+            // Calculate loss
+            float loss = cross_entropy_loss(network.layers[1]->output, y_train[i], NUM_CLASSES);
+            epoch_loss += loss;
+            
+            // Backward pass
+            // Start with gradient of loss w.r.t. softmax output
+            float output_gradients[NUM_CLASSES];
+            for (int c = 0; c < NUM_CLASSES; c++) {
+                output_gradients[c] = network.layers[1]->output[c] - (c == y_train[i] ? 1.0f : 0.0f);
             }
+            
+            // Backprop through second linear layer
+            float *hidden_gradients = network.layers[1]->backward(network.layers[1], output_gradients);
+            
+            // Backprop through ReLU
+            for (int h = 0; h < 16; h++) {
+                hidden_gradients[h] *= (hidden_activations[h] > 0) ? 1.0f : 0.0f;
+            }
+            
+            // Backprop through first linear layer
+            network.layers[0]->backward(network.layers[0], hidden_gradients);
             
             // Update weights
             update_weights(&network, learning_rate);
-            free(inputs);
+
+            log_gradients(&network, epoch, sample_num);
         }
         
-        // Epoch statistics
-        float accuracy = (float)correct / num_samples * 100.0f;
-        printf("Epoch %d/%d - Loss: %.4f, Accuracy: %.2f%%\n", 
-               epoch+1, epochs, epoch_loss/num_samples, accuracy);
+        // Print training progress
+        if ((epoch + 1) % 10 == 0) {
+            printf("Epoch [%d/%d], Loss: %.4f\n", epoch + 1, epochs, epoch_loss / TRAIN_SIZE);
+        }
     }
+    
+    // Evaluation
+    int predictions[TEST_SIZE];
+    float test_loss = 0.0f;
+    
+    for (int i = 0; i < TEST_SIZE; i++) {
+        // Forward pass (no need for gradients during evaluation)
+        network.layers[0]->forward(network.layers[0], X_test[i], NUM_FEATURES);
+        memcpy(hidden_activations, network.layers[0]->output, sizeof(float) * 16);
+        relu_forward(hidden_activations, 16);
+        network.layers[1]->forward(network.layers[1], hidden_activations, 16);
+        memcpy(output_activations, network.layers[1]->output, sizeof(float) * NUM_CLASSES);
+        softmax(output_activations, NUM_CLASSES);
+        
+        // Get predicted class
+        int pred_class = 0;
+        float max_prob = output_activations[0];
+        for (int c = 1; c < NUM_CLASSES; c++) {
+            if (output_activations[c] > max_prob) {
+                max_prob = output_activations[c];
+                pred_class = c;
+            }
+        }
+        predictions[i] = pred_class;
+        
+        // Calculate loss
+        test_loss += cross_entropy_loss(output_activations, y_test[i], NUM_CLASSES);
+    }
+    
+    // Calculate accuracy
+    float accuracy = calculate_accuracy(predictions, y_test, TEST_SIZE);
+    printf("\nTest Accuracy: %.2f%%\n", accuracy * 100);
     
     // Cleanup
     for (size_t i = 0; i < network.num_layers; i++) {
         free(network.layers[i]);
     }
     free(network.layers);
-    printf("Training complete!\n");
+}
+
+#define NUM_SAMPLES 5000
+#define TRAIN_SIZE 4000
+#define TEST_SIZE 1000
+#define IMG_SIZE 28
+#define NUM_CLASSES 2
+#define PROTOTYPE_SIZE 3
+#define BATCH_SIZE 16
+
+// Generate learnable synthetic data
+void generate_learnable_data(float images[NUM_SAMPLES][1][IMG_SIZE][IMG_SIZE], int labels[NUM_SAMPLES]) {
+    // Create 10 distinct prototype patterns
+    float prototypes[NUM_CLASSES][1][PROTOTYPE_SIZE][PROTOTYPE_SIZE];
+    
+    srand(42); // For reproducibility
+    
+    // Initialize prototypes with random patterns
+    for (int c = 0; c < NUM_CLASSES; c++) {
+        for (int i = 0; i < PROTOTYPE_SIZE; i++) {
+            for (int j = 0; j < PROTOTYPE_SIZE; j++) {
+                prototypes[c][0][i][j] = (float)rand() / RAND_MAX * 2.0f - 1.0f;
+            }
+        }
+    }
+    
+    // Generate each sample
+    for (int n = 0; n < NUM_SAMPLES; n++) {
+        int class_idx = n % NUM_CLASSES;
+        labels[n] = class_idx;
+        
+        // Clear the image
+        memset(images[n], 0, sizeof(float) * 1 * IMG_SIZE * IMG_SIZE);
+        
+        // Place prototype at random position
+        int x_pos = rand() % (IMG_SIZE - PROTOTYPE_SIZE + 1);
+        int y_pos = rand() % (IMG_SIZE - PROTOTYPE_SIZE + 1);
+        
+        for (int i = 0; i < PROTOTYPE_SIZE; i++) {
+            for (int j = 0; j < PROTOTYPE_SIZE; j++) {
+                images[n][0][x_pos + i][y_pos + j] = prototypes[class_idx][0][i][j];
+            }
+        }
+        
+        // Add noise
+        for (int i = 0; i < IMG_SIZE; i++) {
+            for (int j = 0; j < IMG_SIZE; j++) {
+                images[n][0][i][j] += 0.1f * ((float)rand() / RAND_MAX * 2.0f - 1.0f);
+            }
+        }
+    }
+}
+
+// Split data into train and test sets
+void split_data(float images[NUM_SAMPLES][1][IMG_SIZE][IMG_SIZE], int labels[NUM_SAMPLES],
+                float X_train[TRAIN_SIZE][1][IMG_SIZE][IMG_SIZE], int y_train[TRAIN_SIZE],
+                float X_test[TEST_SIZE][1][IMG_SIZE][IMG_SIZE], int y_test[TEST_SIZE]) {
+    // Create shuffled indices
+    int indices[NUM_SAMPLES];
+    for (int i = 0; i < NUM_SAMPLES; i++) indices[i] = i;
+    
+    for (int i = NUM_SAMPLES - 1; i > 0; i--) {
+        int j = rand() % (i + 1);
+        int temp = indices[i];
+        indices[i] = indices[j];
+        indices[j] = temp;
+    }
+    
+    // Split into train and test
+    for (int i = 0; i < TRAIN_SIZE; i++) {
+        memcpy(X_train[i], images[indices[i]], sizeof(float) * 1 * IMG_SIZE * IMG_SIZE);
+        y_train[i] = labels[indices[i]];
+    }
+    
+    for (int i = 0; i < TEST_SIZE; i++) {
+        memcpy(X_test[i], images[indices[TRAIN_SIZE + i]], sizeof(float) * 1 * IMG_SIZE * IMG_SIZE);
+        y_test[i] = labels[indices[TRAIN_SIZE + i]];
+    }
+}
+
+void prototype_classification_example() {
+    printf("=== Entering train_network() ===\n");
+    fflush(stdout);
+    
+    srand(time(NULL));
+
+    // Allocate large arrays on heap instead of stack
+    float (*images)[1][IMG_SIZE][IMG_SIZE] = malloc(NUM_SAMPLES * sizeof(*images));
+    int *labels = malloc(NUM_SAMPLES * sizeof(int));
+    
+    float (*X_train)[1][IMG_SIZE][IMG_SIZE] = malloc(TRAIN_SIZE * sizeof(*X_train));
+    int *y_train = malloc(TRAIN_SIZE * sizeof(int));
+    
+    float (*X_test)[1][IMG_SIZE][IMG_SIZE] = malloc(TEST_SIZE * sizeof(*X_test));
+    int *y_test = malloc(TEST_SIZE * sizeof(int));
+
+    if (!images || !labels || !X_train || !y_train || !X_test || !y_test) {
+        fprintf(stderr, "Memory allocation failed\n");
+        exit(EXIT_FAILURE);
+    }
+
+    // Generate data
+    generate_learnable_data(images, labels);
+    split_data(images, labels, X_train, y_train, X_test, y_test);
+    
+    // Initialize network
+    Network *network = create_network(4);
+    //network.num_layers = 4;
+    //network.layers = malloc(network.num_layers * sizeof(LayerBase*));
+    
+    if (!network->layers) {
+        fprintf(stderr, "Failed to allocate network layers\n");
+        exit(EXIT_FAILURE);
+    }
+    
+    // Create and add layers
+    Conv2DLayer* conv1 = create_conv2d_layer(IMG_SIZE, IMG_SIZE, 1, 4, 3, 1, 1);
+    MaxPool2DLayer* pool1 = create_maxpool_layer(IMG_SIZE-2, IMG_SIZE-2, 4, 2, 2);
+    FlattenLayer* flatten = create_flatten_layer(4 * 13 * 13);
+    LinearLayer* linear = create_linear_layer(4 * 13 * 13, NUM_CLASSES);
+    
+    add_layer(network, (LayerBase*)conv1, 0);
+    add_layer(network, (LayerBase*)pool1, 1);
+    add_layer(network, (LayerBase*)flatten, 2);
+    add_layer(network, (LayerBase*)linear, 3);
+
+    
+    // Training parameters
+    float learning_rate = 0.01f;
+    int epochs = 25;
+    int batch_num = 1;
+    
+    for (int epoch = 0; epoch < epochs; epoch++) {
+        float epoch_loss = 0.0f;
+        int correct = 0;
+        int sample_num = 1;
+        
+
+        for (int batch_start = 0; batch_start < TRAIN_SIZE; batch_start += BATCH_SIZE) {
+            int batch_end = batch_start + BATCH_SIZE;
+            if (batch_end > TRAIN_SIZE) batch_end = TRAIN_SIZE;
+    
+            // Zero gradients at start of batch
+            zero_grads(network);
+    
+            for (int i = batch_start; i < batch_end; i++) {
+                network->forward(network, X_train[i][0], 1 * IMG_SIZE * IMG_SIZE);
+    
+                // Get final output
+                float* output = network->layers[network->num_layers - 1]->output;
+    
+                // Softmax
+                float softmax_output[NUM_CLASSES];
+                float max_val = output[0];
+                for (int c = 1; c < NUM_CLASSES; c++) {
+                    if (output[c] > max_val) max_val = output[c];
+                }
+    
+                float sum = 0.0f;
+                for (int c = 0; c < NUM_CLASSES; c++) {
+                    softmax_output[c] = expf(output[c] - max_val);
+                    sum += softmax_output[c];
+                }
+    
+                for (int c = 0; c < NUM_CLASSES; c++) {
+                    softmax_output[c] /= sum;
+                }
+
+                printf("Epoch %d, Sample %d: Label=%d, Softmax[y]=%f\n", 
+                    epoch, i, y_train[i], softmax_output[y_train[i]]);
+             
+    
+                float loss = -logf(softmax_output[y_train[i]] + 1e-10f);
+                epoch_loss += loss;
+    
+                // Accuracy
+                int pred = 0;
+                float max_prob = softmax_output[0];
+                for (int c = 1; c < NUM_CLASSES; c++) {
+                    if (softmax_output[c] > max_prob) {
+                        max_prob = softmax_output[c];
+                        pred = c;
+                    }
+                }
+                if (pred == y_train[i]) correct++;
+    
+                // Backward pass
+                float grad[NUM_CLASSES];
+                for (int c = 0; c < NUM_CLASSES; c++) {
+                    grad[c] = softmax_output[c] - (c == y_train[i] ? 1.0f : 0.0f);
+                }
+    
+                float* gradients = grad;
+                for (int l = network->num_layers - 1; l >= 0; l--) {
+                    gradients = network->layers[l]->backward(network->layers[l], gradients);
+                }
+
+                log_gradients(network, epoch, sample_num);
+                sample_num++;
+            }
+            
+            // Update weights once per batch
+            update_weights(network, learning_rate);
+            log_weights(network, epoch, batch_num);
+
+            ++batch_num;
+        }
+    
+        printf("Epoch %d/%d - Loss: %.4f, Accuracy: %.2f%%\n",
+               epoch + 1, epochs, epoch_loss / TRAIN_SIZE, 100.0f * correct / TRAIN_SIZE);
+    }
+    
+    // Test evaluation
+    int test_correct = 0;
+    for (int i = 0; i < TEST_SIZE; i++) {
+        network->layers[0]->forward(network->layers[0], X_test[i][0], 1 * IMG_SIZE * IMG_SIZE);
+        for (int l = 1; l < network->num_layers; l++) {
+            LayerBase* prev = network->layers[l-1];
+            network->layers[l]->forward(network->layers[l], prev->output, prev->output_size);
+        }
+        
+        float* output = network->layers[network->num_layers-1]->output;
+        int pred = 0;
+        for (int c = 1; c < NUM_CLASSES; c++) {
+            if (output[c] > output[pred]) {
+                pred = c;
+            }
+        }
+        if (pred == y_test[i]) test_correct++;
+    }
+    
+    printf("Test Accuracy: %.2f%%\n", 100.0f*test_correct/TEST_SIZE);
+    
+    // Cleanup
+    for (int i = 0; i < network->num_layers; i++) {
+       free(network->layers[i]);
+    }
+    free(network->layers);
 }
