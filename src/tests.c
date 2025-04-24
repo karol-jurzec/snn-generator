@@ -706,7 +706,7 @@ void save_output_to_file(const float* output, int batch_num, int sample_num, con
     }
 
     fprintf(file, "Batch %d, Sample %d:\n", batch_num, sample_num);
-    for (int i = 0; i < NUM_FEATURES; i++) {
+    for (int i = 0; i < NUM_CLASSES; i++) {
         fprintf(file, "%f ", output[i]);
     }
     fprintf(file, "\n\n");
@@ -772,9 +772,11 @@ void iris_classification_example() {
 
                 network.layers[1]->forward(network.layers[1], batch_hidden_activations[i], 16);
                 memcpy(batch_output_activations[i], network.layers[1]->output, NUM_CLASSES * sizeof(float));
-                save_output_to_file(network.layers[1]->output, batch_start, i, "out/iris_outputs");
 
                 softmax(batch_output_activations[i], NUM_CLASSES);
+
+                save_output_to_file(network.layers[1]->output, batch_start, i, "out/iris_outputs_batch.txt");
+
 
                 epoch_loss += cross_entropy_loss(batch_output_activations[i], batch_y[i], NUM_CLASSES);
             }
@@ -940,7 +942,7 @@ void prototype_classification_example() {
     printf("=== Entering train_network() ===\n");
     fflush(stdout);
     
-    srand(time(NULL));
+    srand(42);
 
     // Allocate large arrays on heap instead of stack
     float (*images)[1][IMG_SIZE][IMG_SIZE] = malloc(NUM_SAMPLES * sizeof(*images));
