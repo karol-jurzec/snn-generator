@@ -650,7 +650,7 @@ float calculate_accuracy(int *predicted, int *true_labels, size_t size) {
     return (float)correct / size;
 }
 
-// Helper function to shuffle the dataset
+// helper to shuffle the dataset
 void shuffle_data(float X[][NUM_FEATURES], int y[], int size, int num_features) {
     for (int i = size - 1; i > 0; i--) {
         int j = rand() % (i + 1);
@@ -666,6 +666,38 @@ void shuffle_data(float X[][NUM_FEATURES], int y[], int size, int num_features) 
         y[i] = y[j];
         y[j] = temp_label;
     }
+}
+
+void scale_gradients_by_batch(Network *network, int batch_size) {
+    for (int l = 0; l < network->num_layers; l++) {
+        LayerBase *layer = network->layers[l];
+
+        LinearLayer *linear = (LinearLayer *)layer;
+        for (int i = 0; i < linear->in_features * linear->out_features; i++) {
+            linear->base.weight_gradients[i] /= (float)batch_size;
+        }
+        for (int i = 0; i < linear->out_features; i++) {
+            linear->base.bias_gradients[i] /= (float)batch_size;
+        }
+    }
+}
+
+#include <stdio.h>
+
+void save_hidden_gradients_to_file(const float* hidden_gradients, int batch_num, int sample_num, int size, const char* filename) {
+    FILE* file = fopen(filename, "a"); // Append mode
+    if (file == NULL) {
+        perror("Failed to open file");
+        return;
+    }
+
+    fprintf(file, "Batch %d, Sample %d:\n", batch_num, sample_num);
+    for (int i = 0; i < size; i++) {
+        fprintf(file, "%f ", hidden_gradients[i]);
+    }
+    fprintf(file, "\n\n");
+
+    fclose(file);
 }
 
 void iris_classification_example() {
@@ -692,74 +724,86 @@ void iris_classification_example() {
     const int epochs = 50;
     const float learning_rate = 0.02f;
     
-    printf("Starting training...\n");
     
-    // Buffers for intermediate activations
-    float hidden_activations[16];  // Output of first linear layer
-    float output_activations[NUM_CLASSES];  // Final output
-    
+    const int batch_size = 16;
+    printf("Starting training with batch size %d...\n", batch_size);
+
+    // Buffers for batch processing
+    float batch_X[batch_size][NUM_FEATURES];
+    int batch_y[batch_size];
+    float batch_hidden_activations[batch_size][16];
+    float batch_output_activations[batch_size][NUM_CLASSES];
+
     for (int epoch = 0; epoch < epochs; epoch++) {
         float epoch_loss = 0.0f;
 
-        int sample_num = 1;
-        
-        // Training loop
-        for (int i = 0; i < TRAIN_SIZE; i++) {
-            // Zero gradients
-            zero_grads(&network);
-            
-            // Forward pass
-            // First linear layer (4->16)
-            network.layers[0]->forward(network.layers[0], X_train[i], NUM_FEATURES);
-            //memcpy(hidden_activations, network.layers[0]->output, sizeof(float) * 16);
-            
-            // ReLU activation
-            relu_forward(network.layers[0]->output, 16);
-            
-            // Second linear layer (16->3)
-            network.layers[1]->forward(network.layers[1], network.layers[0]->output, 16);
-            //memcpy(output_activations, network.layers[1]->output, sizeof(float) * NUM_CLASSES);
-            
-            // Softmax (for loss calculation)
-            softmax(network.layers[1]->output, NUM_CLASSES);
-            
-            // Calculate loss
-            float loss = cross_entropy_loss(network.layers[1]->output, y_train[i], NUM_CLASSES);
-            epoch_loss += loss;
-            
-            // Backward pass
-            // Start with gradient of loss w.r.t. softmax output
-            float output_gradients[NUM_CLASSES];
-            for (int c = 0; c < NUM_CLASSES; c++) {
-                output_gradients[c] = network.layers[1]->output[c] - (c == y_train[i] ? 1.0f : 0.0f);
+        shuffle_data(X_train, y_train, TRAIN_SIZE, NUM_FEATURES);
+
+        for (int batch_start = 0; batch_start < TRAIN_SIZE; batch_start += batch_size) {
+            int current_batch_size = (batch_start + batch_size <= TRAIN_SIZE) ? batch_size : TRAIN_SIZE - batch_start;
+
+            zero_grads(&network);  // ✅ clear all accumulated gradients
+
+            // Prepare batch data
+            for (int i = 0; i < current_batch_size; i++) {
+                memcpy(batch_X[i], X_train[batch_start + i], NUM_FEATURES * sizeof(float));
+                batch_y[i] = y_train[batch_start + i];
             }
-            
-            // Backprop through second linear layer
-            float *hidden_gradients = network.layers[1]->backward(network.layers[1], output_gradients);
-            
-            // Backprop through ReLU
-            for (int h = 0; h < 16; h++) {
-                hidden_gradients[h] *= (hidden_activations[h] > 0) ? 1.0f : 0.0f;
+
+            // Forward pass over the batch
+            for (int i = 0; i < current_batch_size; i++) {
+                network.layers[0]->forward(network.layers[0], batch_X[i], NUM_FEATURES);
+                memcpy(batch_hidden_activations[i], network.layers[0]->output, 16 * sizeof(float));
+                relu_forward(batch_hidden_activations[i], 16);  // In-place ReLU
+
+                network.layers[1]->forward(network.layers[1], batch_hidden_activations[i], 16);
+                memcpy(batch_output_activations[i], network.layers[1]->output, NUM_CLASSES * sizeof(float));
+                softmax(batch_output_activations[i], NUM_CLASSES);
+
+                epoch_loss += cross_entropy_loss(batch_output_activations[i], batch_y[i], NUM_CLASSES);
             }
-            
-            // Backprop through first linear layer
-            network.layers[0]->backward(network.layers[0], hidden_gradients);
-            
+
+            // Backward pass for each sample
+            for (int i = 0; i < current_batch_size; i++) {
+                float output_gradients[NUM_CLASSES];
+                for (int c = 0; c < NUM_CLASSES; c++) {
+                    // Do NOT divide by batch size here!
+                    output_gradients[c] = batch_output_activations[i][c] - (c == batch_y[i] ? 1.0f : 0.0f);
+                }
+
+                float* hidden_gradients = network.layers[1]->backward(network.layers[1], output_gradients);
+
+                // Apply ReLU derivative
+                for (int h = 0; h < 16; h++) {
+                    hidden_gradients[h] *= (batch_hidden_activations[i][h] > 0) ? 1.0f : 0.0f;
+                }
+
+                save_hidden_gradients_to_file(hidden_gradients, batch_start / batch_size, i, 16, "out/hidden_gradients_log.txt");
+
+
+                network.layers[0]->backward(network.layers[0], hidden_gradients);
+            }
+
+            // Now divide accumulated gradients by batch size
+            scale_gradients_by_batch(&network, current_batch_size);
+
             // Update weights
             update_weights(&network, learning_rate);
-
-            log_gradients(&network, epoch, sample_num);
+            
         }
-        
-        // Print training progress
+
+        //log_gradients(&network, epoch, 0);
+    
         if ((epoch + 1) % 10 == 0) {
             printf("Epoch [%d/%d], Loss: %.4f\n", epoch + 1, epochs, epoch_loss / TRAIN_SIZE);
         }
     }
     
-    // Evaluation
+    // Evaluation (same as before)
     int predictions[TEST_SIZE];
     float test_loss = 0.0f;
+    float hidden_activations[16];
+    float output_activations[NUM_CLASSES];
     
     for (int i = 0; i < TEST_SIZE; i++) {
         // Forward pass (no need for gradients during evaluation)
