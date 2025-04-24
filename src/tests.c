@@ -682,8 +682,6 @@ void scale_gradients_by_batch(Network *network, int batch_size) {
     }
 }
 
-#include <stdio.h>
-
 void save_hidden_gradients_to_file(const float* hidden_gradients, int batch_num, int sample_num, int size, const char* filename) {
     FILE* file = fopen(filename, "a"); // Append mode
     if (file == NULL) {
@@ -694,6 +692,22 @@ void save_hidden_gradients_to_file(const float* hidden_gradients, int batch_num,
     fprintf(file, "Batch %d, Sample %d:\n", batch_num, sample_num);
     for (int i = 0; i < size; i++) {
         fprintf(file, "%f ", hidden_gradients[i]);
+    }
+    fprintf(file, "\n\n");
+
+    fclose(file);
+}
+
+void save_output_to_file(const float* output, int batch_num, int sample_num, const char* filename) {
+    FILE* file = fopen(filename, "a"); // Append mode
+    if (file == NULL) {
+        perror("Failed to open file");
+        return;
+    }
+
+    fprintf(file, "Batch %d, Sample %d:\n", batch_num, sample_num);
+    for (int i = 0; i < NUM_FEATURES; i++) {
+        fprintf(file, "%f ", output[i]);
     }
     fprintf(file, "\n\n");
 
@@ -725,7 +739,7 @@ void iris_classification_example() {
     const float learning_rate = 0.02f;
     
     
-    const int batch_size = 16;
+    const int batch_size = 1;
     printf("Starting training with batch size %d...\n", batch_size);
 
     // Buffers for batch processing
@@ -758,10 +772,14 @@ void iris_classification_example() {
 
                 network.layers[1]->forward(network.layers[1], batch_hidden_activations[i], 16);
                 memcpy(batch_output_activations[i], network.layers[1]->output, NUM_CLASSES * sizeof(float));
+                save_output_to_file(network.layers[1]->output, batch_start, i, "out/iris_outputs");
+
                 softmax(batch_output_activations[i], NUM_CLASSES);
 
                 epoch_loss += cross_entropy_loss(batch_output_activations[i], batch_y[i], NUM_CLASSES);
             }
+
+            
 
             // Backward pass for each sample
             for (int i = 0; i < current_batch_size; i++) {
@@ -778,7 +796,7 @@ void iris_classification_example() {
                     hidden_gradients[h] *= (batch_hidden_activations[i][h] > 0) ? 1.0f : 0.0f;
                 }
 
-                save_hidden_gradients_to_file(hidden_gradients, batch_start / batch_size, i, 16, "out/hidden_gradients_log.txt");
+                //save_hidden_gradients_to_file(hidden_gradients, batch_start / batch_size, i, 16, "out/hidden_gradients_log.txt");
 
 
                 network.layers[0]->backward(network.layers[0], hidden_gradients);
