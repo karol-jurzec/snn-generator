@@ -751,7 +751,7 @@ void iris_classification_example() {
     for (int epoch = 0; epoch < epochs; epoch++) {
         float epoch_loss = 0.0f;
 
-        shuffle_data(X_train, y_train, TRAIN_SIZE, NUM_FEATURES);
+        //shuffle_data(X_train, y_train, TRAIN_SIZE, NUM_FEATURES);
 
         for (int batch_start = 0; batch_start < TRAIN_SIZE; batch_start += batch_size) {
             int current_batch_size = (batch_start + batch_size <= TRAIN_SIZE) ? batch_size : TRAIN_SIZE - batch_start;
@@ -775,7 +775,7 @@ void iris_classification_example() {
 
                 softmax(batch_output_activations[i], NUM_CLASSES);
 
-                save_output_to_file(network.layers[1]->output, batch_start, i, "out/iris_outputs_batch.txt");
+                save_output_to_file(batch_output_activations[i], batch_start, i, "out/iris_outputs_batch.txt");
 
 
                 epoch_loss += cross_entropy_loss(batch_output_activations[i], batch_y[i], NUM_CLASSES);
