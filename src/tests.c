@@ -715,7 +715,7 @@ void save_output_to_file(const float* output, int batch_num, int sample_num, con
 }
 
 void iris_classification_example() {
-    srand(42);  // For reproducibility
+    srand(time(NULL));  // For reproducibility
     
     // Load dataset
     float X_train[TRAIN_SIZE][NUM_FEATURES];
@@ -735,8 +735,8 @@ void iris_classification_example() {
     add_layer(&network, (LayerBase*)create_linear_layer(16, NUM_CLASSES), 1);
     
     // Training parameters
-    const int epochs = 50;
-    const float learning_rate = 0.02f;
+    const int epochs = 100;
+    const float learning_rate = 0.1f;
     
     
     const int batch_size = 1;
@@ -751,10 +751,14 @@ void iris_classification_example() {
     for (int epoch = 0; epoch < epochs; epoch++) {
         float epoch_loss = 0.0f;
 
-        //shuffle_data(X_train, y_train, TRAIN_SIZE, NUM_FEATURES);
+        shuffle_data(X_train, y_train, TRAIN_SIZE, NUM_FEATURES);
 
         for (int batch_start = 0; batch_start < TRAIN_SIZE; batch_start += batch_size) {
             int current_batch_size = (batch_start + batch_size <= TRAIN_SIZE) ? batch_size : TRAIN_SIZE - batch_start;
+
+            float *grads = ((LinearLayer *)network.layers[0])->base.weight_gradients;
+            float batch_loss = 0.0f;
+
 
             zero_grads(&network);  // ✅ clear all accumulated gradients
 
@@ -767,20 +771,26 @@ void iris_classification_example() {
             // Forward pass over the batch
             for (int i = 0; i < current_batch_size; i++) {
                 network.layers[0]->forward(network.layers[0], batch_X[i], NUM_FEATURES);
-                memcpy(batch_hidden_activations[i], network.layers[0]->output, 16 * sizeof(float));
-                relu_forward(batch_hidden_activations[i], 16);  // In-place ReLU
+                //memcpy(batch_hidden_activations[i], network.layers[0]->output, 16 * sizeof(float));
+                //relu_forward(batch_hidden_activations[i], 16);  // In-place ReLU
+                relu_forward(network.layers[0]->output, 16);  // apply directly to .output
+                memcpy(batch_hidden_activations[i], network.layers[0]->output, 16 * sizeof(float)); // optional, for reuse
+
 
                 network.layers[1]->forward(network.layers[1], batch_hidden_activations[i], 16);
                 memcpy(batch_output_activations[i], network.layers[1]->output, NUM_CLASSES * sizeof(float));
 
                 softmax(batch_output_activations[i], NUM_CLASSES);
 
-                save_output_to_file(batch_output_activations[i], batch_start, i, "out/iris_outputs_batch.txt");
+               // save_output_to_file(batch_output_activations[i], batch_start, i, "out/iris_outputs_batch.txt");
 
 
-                epoch_loss += cross_entropy_loss(batch_output_activations[i], batch_y[i], NUM_CLASSES);
+                // epoch_loss += cross_entropy_loss(batch_output_activations[i], batch_y[i], NUM_CLASSES);
+
+                batch_loss += cross_entropy_loss(batch_output_activations[i], batch_y[i], NUM_CLASSES);
             }
 
+            epoch_loss += batch_loss;
             
 
             // Backward pass for each sample
@@ -798,11 +808,13 @@ void iris_classification_example() {
                     hidden_gradients[h] *= (batch_hidden_activations[i][h] > 0) ? 1.0f : 0.0f;
                 }
 
-                //save_hidden_gradients_to_file(hidden_gradients, batch_start / batch_size, i, 16, "out/hidden_gradients_log.txt");
+              //  save_hidden_gradients_to_file(hidden_gradients, batch_start / batch_size, i, 16, "out/hidden_gradients_log.txt");
 
 
                 network.layers[0]->backward(network.layers[0], hidden_gradients);
             }
+
+            float *gradsW = ((LinearLayer *)network.layers[0])->base.weight_gradients;
 
             // Now divide accumulated gradients by batch size
             scale_gradients_by_batch(&network, current_batch_size);
