@@ -58,9 +58,9 @@ int main(int argc, char *argv[]) {
     //train_test();
     //discretization_test();
 
-    iris_classification_example();
+    //iris_classification_example();
 
-    //prototype_classification_example();
+    prototype_classification_example();
 
 
     return 0;

@@ -735,11 +735,11 @@ void iris_classification_example() {
     add_layer(&network, (LayerBase*)create_linear_layer(16, NUM_CLASSES), 1);
     
     // Training parameters
-    const int epochs = 100;
-    const float learning_rate = 0.1f;
+    const int epochs = 200;
+    const float learning_rate = 0.02f;
     
     
-    const int batch_size = 1;
+    const int batch_size = 32;
     printf("Starting training with batch size %d...\n", batch_size);
 
     // Buffers for batch processing
@@ -953,16 +953,14 @@ void split_data(float images[NUM_SAMPLES][1][IMG_SIZE][IMG_SIZE], int labels[NUM
 void prototype_classification_example() {
     printf("=== Entering train_network() ===\n");
     fflush(stdout);
-    
+
     srand(42);
 
-    // Allocate large arrays on heap instead of stack
+    // Allocate large arrays
     float (*images)[1][IMG_SIZE][IMG_SIZE] = malloc(NUM_SAMPLES * sizeof(*images));
     int *labels = malloc(NUM_SAMPLES * sizeof(int));
-    
     float (*X_train)[1][IMG_SIZE][IMG_SIZE] = malloc(TRAIN_SIZE * sizeof(*X_train));
     int *y_train = malloc(TRAIN_SIZE * sizeof(int));
-    
     float (*X_test)[1][IMG_SIZE][IMG_SIZE] = malloc(TEST_SIZE * sizeof(*X_test));
     int *y_test = malloc(TEST_SIZE * sizeof(int));
 
@@ -971,97 +969,93 @@ void prototype_classification_example() {
         exit(EXIT_FAILURE);
     }
 
-    // Generate data
     generate_learnable_data(images, labels);
     split_data(images, labels, X_train, y_train, X_test, y_test);
-    
+
     // Initialize network
     Network *network = create_network(4);
-    //network.num_layers = 4;
-    //network.layers = malloc(network.num_layers * sizeof(LayerBase*));
-    
     if (!network->layers) {
         fprintf(stderr, "Failed to allocate network layers\n");
         exit(EXIT_FAILURE);
     }
-    
-    // Create and add layers
+
     Conv2DLayer* conv1 = create_conv2d_layer(IMG_SIZE, IMG_SIZE, 1, 4, 3, 1, 1);
-    MaxPool2DLayer* pool1 = create_maxpool_layer(IMG_SIZE-2, IMG_SIZE-2, 4, 2, 2);
+    MaxPool2DLayer* pool1 = create_maxpool_layer(IMG_SIZE - 2, IMG_SIZE - 2, 4, 2, 2);
     FlattenLayer* flatten = create_flatten_layer(4 * 13 * 13);
     LinearLayer* linear = create_linear_layer(4 * 13 * 13, NUM_CLASSES);
-    
+
     add_layer(network, (LayerBase*)conv1, 0);
     add_layer(network, (LayerBase*)pool1, 1);
     add_layer(network, (LayerBase*)flatten, 2);
     add_layer(network, (LayerBase*)linear, 3);
 
-    
     // Training parameters
     float learning_rate = 0.01f;
     int epochs = 25;
     int batch_num = 1;
-    
+
     for (int epoch = 0; epoch < epochs; epoch++) {
         float epoch_loss = 0.0f;
         int correct = 0;
         int sample_num = 1;
-        
 
         for (int batch_start = 0; batch_start < TRAIN_SIZE; batch_start += BATCH_SIZE) {
             int batch_end = batch_start + BATCH_SIZE;
             if (batch_end > TRAIN_SIZE) batch_end = TRAIN_SIZE;
-    
-            // Zero gradients at start of batch
-            zero_grads(network);
-    
+            int current_batch_size = batch_end - batch_start;
+
+            zero_grads(network); // Clear gradients for the batch
+
+            // ==== First: Forward over batch and accumulate loss ====
+            float batch_loss = 0.0f;
+            float batch_softmax_outputs[BATCH_SIZE][NUM_CLASSES];
+            int batch_labels[BATCH_SIZE];
+
             for (int i = batch_start; i < batch_end; i++) {
                 network->forward(network, X_train[i][0], 1 * IMG_SIZE * IMG_SIZE);
-    
-                // Get final output
+
                 float* output = network->layers[network->num_layers - 1]->output;
-    
+
                 // Softmax
-                float softmax_output[NUM_CLASSES];
                 float max_val = output[0];
                 for (int c = 1; c < NUM_CLASSES; c++) {
                     if (output[c] > max_val) max_val = output[c];
                 }
-    
                 float sum = 0.0f;
                 for (int c = 0; c < NUM_CLASSES; c++) {
-                    softmax_output[c] = expf(output[c] - max_val);
-                    sum += softmax_output[c];
+                    batch_softmax_outputs[i - batch_start][c] = expf(output[c] - max_val);
+                    sum += batch_softmax_outputs[i - batch_start][c];
                 }
-    
                 for (int c = 0; c < NUM_CLASSES; c++) {
-                    softmax_output[c] /= sum;
+                    batch_softmax_outputs[i - batch_start][c] /= sum;
                 }
 
-                printf("Epoch %d, Sample %d: Label=%d, Softmax[y]=%f\n", 
-                    epoch, i, y_train[i], softmax_output[y_train[i]]);
-             
-    
-                float loss = -logf(softmax_output[y_train[i]] + 1e-10f);
-                epoch_loss += loss;
-    
+                int label = y_train[i];
+                batch_labels[i - batch_start] = label;
+
+                batch_loss += -logf(batch_softmax_outputs[i - batch_start][label] + 1e-10f);
+
                 // Accuracy
                 int pred = 0;
-                float max_prob = softmax_output[0];
+                float max_prob = batch_softmax_outputs[i - batch_start][0];
                 for (int c = 1; c < NUM_CLASSES; c++) {
-                    if (softmax_output[c] > max_prob) {
-                        max_prob = softmax_output[c];
+                    if (batch_softmax_outputs[i - batch_start][c] > max_prob) {
+                        max_prob = batch_softmax_outputs[i - batch_start][c];
                         pred = c;
                     }
                 }
-                if (pred == y_train[i]) correct++;
-    
-                // Backward pass
+                if (pred == label) correct++;
+            }
+
+            epoch_loss += batch_loss;
+
+            // ==== Then: Backward over batch ====
+            for (int b = 0; b < current_batch_size; b++) {
                 float grad[NUM_CLASSES];
                 for (int c = 0; c < NUM_CLASSES; c++) {
-                    grad[c] = softmax_output[c] - (c == y_train[i] ? 1.0f : 0.0f);
+                    grad[c] = batch_softmax_outputs[b][c] - (c == batch_labels[b] ? 1.0f : 0.0f);
                 }
-    
+
                 float* gradients = grad;
                 for (int l = network->num_layers - 1; l >= 0; l--) {
                     gradients = network->layers[l]->backward(network->layers[l], gradients);
@@ -1070,18 +1064,17 @@ void prototype_classification_example() {
                 log_gradients(network, epoch, sample_num);
                 sample_num++;
             }
-            
-            // Update weights once per batch
+
+            // ==== Update weights once after full batch ====
             update_weights(network, learning_rate);
             log_weights(network, epoch, batch_num);
-
-            ++batch_num;
+            batch_num++;
         }
-    
+
         printf("Epoch %d/%d - Loss: %.4f, Accuracy: %.2f%%\n",
                epoch + 1, epochs, epoch_loss / TRAIN_SIZE, 100.0f * correct / TRAIN_SIZE);
     }
-    
+
     // Test evaluation
     int test_correct = 0;
     for (int i = 0; i < TEST_SIZE; i++) {
@@ -1090,22 +1083,19 @@ void prototype_classification_example() {
             LayerBase* prev = network->layers[l-1];
             network->layers[l]->forward(network->layers[l], prev->output, prev->output_size);
         }
-        
-        float* output = network->layers[network->num_layers-1]->output;
+        float* output = network->layers[network->num_layers - 1]->output;
         int pred = 0;
         for (int c = 1; c < NUM_CLASSES; c++) {
-            if (output[c] > output[pred]) {
-                pred = c;
-            }
+            if (output[c] > output[pred]) pred = c;
         }
         if (pred == y_test[i]) test_correct++;
     }
-    
-    printf("Test Accuracy: %.2f%%\n", 100.0f*test_correct/TEST_SIZE);
-    
+
+    printf("Test Accuracy: %.2f%%\n", 100.0f * test_correct / TEST_SIZE);
+
     // Cleanup
     for (int i = 0; i < network->num_layers; i++) {
-       free(network->layers[i]);
+        free(network->layers[i]);
     }
     free(network->layers);
 }
