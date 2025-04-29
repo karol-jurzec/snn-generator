@@ -60,8 +60,8 @@ int main(int argc, char *argv[]) {
 
     //iris_classification_example();
 
-    prototype_classification_example();
-
-
+    hor_vert_dataset();
     return 0;
 }
+
+

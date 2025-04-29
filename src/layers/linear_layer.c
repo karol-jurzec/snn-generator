@@ -16,6 +16,7 @@ void he_kaiming_uniform_init_linear(float *weights, size_t size, int fan_in) {
 }
 
 void linear_initialize(LinearLayer *layer, size_t in_features, size_t out_features) {
+    layer->base.layer_type = LAYER_LINEAR;
     layer->base.forward = linear_forward;
     layer->base.backward = linear_backward;
     layer->base.zero_grad = linear_zero_grad;  // Assign function pointer
@@ -37,7 +38,7 @@ void linear_initialize(LinearLayer *layer, size_t in_features, size_t out_featur
     he_kaiming_uniform_init_linear(layer->base.weights, in_features * out_features, in_features);
     initialize_biases(layer->biases, out_features, in_features);
 
-    layer->base.weight_gradients = (float *)malloc(in_features * out_features * sizeof(float));
+    layer->base.weight_gradients = (float *)malloc(layer->base.num_weights * sizeof(float));
     layer->base.bias_gradients = (float *)malloc(out_features * sizeof(float));
     layer->base.input_gradients = (float *)malloc(in_features * sizeof(float));
 }

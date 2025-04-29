@@ -16,6 +16,7 @@ void he_kaiming_uniform_init(float *weights, size_t size, int in_channels, int k
 
 void conv2d_initialize(Conv2DLayer *layer, int in_channels, int out_channels, int kernel_size, int stride, int padding, int input_dim) {
     //size_t input_dim = 28;
+    layer->base.layer_type = LAYER_CONV2D;
     layer->base.forward = conv2d_forward;
     layer->base.num_inputs = input_dim * input_dim * in_channels; 
     layer->base.backward = conv2d_backward;

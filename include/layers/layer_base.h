@@ -12,6 +12,15 @@
 #define ZERO_GRAD_FUNC(name) void (*name)(void *self)
 
 
+// Enum to define different layer types
+typedef enum {
+    LAYER_CONV2D,
+    LAYER_LINEAR,
+    LAYER_MAXPOOL2D, 
+    LAYER_FLATTEN, 
+    LAYER_SPIKING
+} LayerType;
+
 // Base structure for layers
 typedef struct {
     LAYER_FORWARD_FUNC(forward);  // Forward function pointer for layers
@@ -32,6 +41,9 @@ typedef struct {
     int num_inputs;
     int output_size;
     bool is_spiking;
+
+    LayerType layer_type;  // Store layer type (Conv2D, Linear, etc.)
+
 } LayerBase;
 
 #endif // LAYER_BASE_H

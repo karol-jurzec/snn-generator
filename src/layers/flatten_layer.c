@@ -5,6 +5,7 @@
 #include "../../include/layers/flatten_layer.h"
 
 void flatten_initialize(FlattenLayer *layer, size_t input_size) {
+    layer->base.layer_type = LAYER_FLATTEN;
     layer->base.num_inputs = input_size;
     layer->base.inputs = NULL;
     layer->base.forward = flatten_forward;

@@ -7,6 +7,7 @@
 #include "../../include/layers/maxpool2d_layer.h"
 
 void maxpool2d_initialize(MaxPool2DLayer *layer, int kernel_size, int stride, int padding, int input_dim, int num_of_channels) {
+    layer->base.layer_type = LAYER_MAXPOOL2D;
     layer->kernel_size = kernel_size;
     layer->stride = stride;
     layer->padding = padding;
@@ -22,10 +23,10 @@ void maxpool2d_initialize(MaxPool2DLayer *layer, int kernel_size, int stride, in
 
     layer->max_indices = NULL;
     layer->base.input_gradients = NULL;
+    layer->base.output = NULL;
 
     //layer->base.output_size = output_dim * output_dim;
-    //layer->base.output = (float *)malloc(layer->base.output_size * sizeof(float));
-
+    
     layer->input_size = 0;
     layer->base.forward = maxpool2d_forward;
     layer->base.backward = maxpool2d_backward;

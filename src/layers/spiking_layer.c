@@ -5,6 +5,7 @@
 #include "../../include/models/lif_neuron.h"
 
 void spiking_initialize(SpikingLayer *layer, size_t num_neurons, ModelBase **neuron_models) {
+    layer->base.layer_type = LAYER_SPIKING;
     layer->base.is_spiking = true;
     layer->base.forward = spiking_forward;
     layer->base.backward = spiking_backward;

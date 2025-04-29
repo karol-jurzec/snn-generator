@@ -1,4 +1,5 @@
 #include "models/model_base.h"
+#include "network.h"
 
 #ifndef TESTS_H
 #define TESTS_H
@@ -20,7 +21,7 @@ void train_test();
 void test_network_training();
 
 void iris_classification_example(); // fully connected network 
-void prototype_classification_example();
+void hor_vert_dataset();
 
 
 #endif // TESTS_H
