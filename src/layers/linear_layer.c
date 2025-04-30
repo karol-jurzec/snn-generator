@@ -18,6 +18,7 @@ void he_kaiming_uniform_init_linear(float *weights, size_t size, int fan_in) {
 void linear_initialize(LinearLayer *layer, size_t in_features, size_t out_features) {
     layer->base.layer_type = LAYER_LINEAR;
     layer->base.forward = linear_forward;
+    layer->base.is_spiking = false;
     layer->base.backward = linear_backward;
     layer->base.zero_grad = linear_zero_grad;  // Assign function pointer
     layer->base.update_weights = linear_update_weights;
@@ -67,6 +68,7 @@ float* linear_backward(void *self, float *gradients) {
     // memset(layer->base.bias_gradients, 0, sizeof(float) * layer->out_features);
 
     for (size_t i = 0; i < layer->out_features; i++) {
+        float checkVal = gradients[i];
         for (size_t j = 0; j < layer->in_features; j++) {
             layer->base.weight_gradients[i * layer->in_features + j] += gradients[i] * layer->base.inputs[j];
         }

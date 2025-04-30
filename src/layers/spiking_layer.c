@@ -47,11 +47,16 @@ float* spiking_backward(void *self, float *gradients) {
     SpikingLayer *layer = (SpikingLayer *)self;
 
     for (size_t i = 0; i < layer->num_neurons; i++) {
-        float membrane_potential = layer->neurons[i]->v;
-        float spike_grad = (1.0f - membrane_potential * membrane_potential); // Example: tanh derivative
-        layer->spike_gradients[i] = gradients[i] * spike_grad;
-
-        layer->base.input_gradients[i] = layer->spike_gradients[i];
+        LIFNeuron* neuron = (LIFNeuron*)layer->neurons[i];
+        
+        // ATAN surrogate gradient (matches snnTorch default)
+        float spike_derivative = 1.0f / (1.0f + neuron->base.v * neuron->base.v);
+        
+        // Combine with incoming gradients
+        layer->spike_gradients[i] = gradients[i] * spike_derivative;
+        
+        // Propagate gradient through membrane potential
+        layer->base.input_gradients[i] = layer->spike_gradients[i] * neuron->beta;
     }
 
     return layer->base.input_gradients;

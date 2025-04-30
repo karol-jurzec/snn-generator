@@ -55,12 +55,12 @@ int main(int argc, char *argv[]) {
    */
 
 //nmnist_loader_test();
-    //train_test();
+    train_test();
     //discretization_test();
 
     //iris_classification_example();
 
-    hor_vert_dataset();
+    //hor_vert_dataset();
     return 0;
 }
 

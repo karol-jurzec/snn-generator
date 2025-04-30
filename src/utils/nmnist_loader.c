@@ -5,11 +5,16 @@
 #include <dirent.h>
 #include <stdint.h>
 
-
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 
 #include "../../include/utils/stb_image_write.h"
 #include "../../include/utils/nmnist_loader.h"
+
+// Load the entire NMNIST dataset
+typedef struct {
+    char path[512];
+    int label;
+} SamplePath;
 
 static void stabilize_events(NMNISTEvent *events, size_t num_events) {
     for (size_t i = 0; i < num_events; i++) {
@@ -96,7 +101,6 @@ NMNISTSample load_nmnist_sample(const char *file_path, int label, bool stabilize
     return sample;
 }
 
-// Load the entire NMNIST dataset
 NMNISTDataset *load_nmnist_dataset(const char *data_dir, size_t max_samples, bool stabilize) {
     NMNISTDataset *dataset = (NMNISTDataset *)malloc(sizeof(NMNISTDataset));
     if (!dataset) {
@@ -111,44 +115,50 @@ NMNISTDataset *load_nmnist_dataset(const char *data_dir, size_t max_samples, boo
         exit(EXIT_FAILURE);
     }
 
-    dataset->num_samples = 0;
+    SamplePath *all_paths = NULL;
+    size_t total_paths = 0;
 
-    // Iterate through all 10 digit directories (0-9)
+    // First pass: Collect all file paths
     for (int digit = 0; digit < 10; digit++) {
         char digit_dir[256];
         snprintf(digit_dir, sizeof(digit_dir), "%s/%d", data_dir, digit);
 
         DIR *dir = opendir(digit_dir);
         if (!dir) {
-            printf("Error: Could not open directory %s\n", digit_dir);
-            continue;  // Skip invalid directories
+            printf("Warning: Could not open directory %s\n", digit_dir);
+            continue;
         }
 
         struct dirent *entry;
         while ((entry = readdir(dir)) != NULL) {
             if (strstr(entry->d_name, ".bin")) {
-                // Construct the full file path
-                char file_path[512];
-                snprintf(file_path, sizeof(file_path), "%s/%s", digit_dir, entry->d_name);
-
-                // Load the NMNIST sample
-                NMNISTSample sample = load_nmnist_sample(file_path, digit, stabilize);
-
-                // Add to the dataset
-                if (dataset->num_samples < max_samples) {
-                    dataset->samples[dataset->num_samples++] = sample;
-                } else {
-                    break;
-                }
+                all_paths = realloc(all_paths, (total_paths + 1) * sizeof(SamplePath));
+                snprintf(all_paths[total_paths].path, sizeof(all_paths[total_paths].path),
+                         "%s/%s", digit_dir, entry->d_name);
+                all_paths[total_paths].label = digit;
+                total_paths++;
             }
         }
         closedir(dir);
-
-        if (dataset->num_samples >= max_samples) {
-            break;
-        }
     }
 
+    // Shuffle the paths
+    srand((unsigned int)time(NULL));
+    for (size_t i = 0; i < total_paths; i++) {
+        size_t j = rand() % total_paths;
+        SamplePath tmp = all_paths[i];
+        all_paths[i] = all_paths[j];
+        all_paths[j] = tmp;
+    }
+
+    // Load up to max_samples
+    dataset->num_samples = 0;
+    for (size_t i = 0; i < total_paths && dataset->num_samples < max_samples; i++) {
+        NMNISTSample sample = load_nmnist_sample(all_paths[i].path, all_paths[i].label, stabilize);
+        dataset->samples[dataset->num_samples++] = sample;
+    }
+
+    free(all_paths);
     return dataset;
 }
 
@@ -317,7 +327,7 @@ void save_frame_as_image(const char *filename, float *data, int height, int widt
 
 // Print a 28x28 array of floats with 1-digit precision
 void print_frame(float *data, int height, int width) {
-    if (height != 28 || width != 28) {
+    if (height != 34 || width != 34) {
         printf("Error: Expected a 28x28 frame, but got %dx%d\n", height, width);
         return;
     }

@@ -18,6 +18,7 @@ void conv2d_initialize(Conv2DLayer *layer, int in_channels, int out_channels, in
     //size_t input_dim = 28;
     layer->base.layer_type = LAYER_CONV2D;
     layer->base.forward = conv2d_forward;
+    layer->base.is_spiking = false;
     layer->base.num_inputs = input_dim * input_dim * in_channels; 
     layer->base.backward = conv2d_backward;
     layer->base.zero_grad = conv2d_zero_grad;  // Assign function pointer

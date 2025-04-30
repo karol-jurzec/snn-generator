@@ -370,7 +370,7 @@ void discretization_test() {
 
 
 void train_test() {
-    const char *network_config_path = "/Users/karol/Desktop/karol/agh/praca-snn/N-MNIST/Train";   
+    const char *network_config_path = "C:/Users/karol/Desktop/karol/agh/praca_snn/N-MNIST/Train/Train";   
     const char *dataset_path = "torch_model.json";
 
     // Load the network
@@ -383,7 +383,7 @@ void train_test() {
 
     // Load the NMNIST dataset
     printf("Loading dataset from %s...\n", network_config_path);
-    NMNISTDataset *dataset = load_nmnist_dataset(network_config_path, 100, true); // Load up to 100 samples
+    NMNISTDataset *dataset = load_nmnist_dataset(network_config_path, 160, true); // Load up to 160 samples
     if (!dataset) {
         printf("Error: Failed to load dataset.\n");
         free_network(network);

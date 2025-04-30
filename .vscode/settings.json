@@ -5,7 +5,10 @@
         "lif_neuron.h": "c",
         "model_base.h": "c",
         "type_traits": "c",
-        "spiking_layer.h": "c"
+        "spiking_layer.h": "c",
+        "cmath": "c",
+        "stb_image_write.h": "c",
+        "nmnist_loader.h": "c"
     },
 "C_Cpp.errorSquiggles": "disabled"
 }

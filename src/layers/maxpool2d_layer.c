@@ -10,6 +10,7 @@ void maxpool2d_initialize(MaxPool2DLayer *layer, int kernel_size, int stride, in
     layer->base.layer_type = LAYER_MAXPOOL2D;
     layer->kernel_size = kernel_size;
     layer->stride = stride;
+    layer->base.is_spiking = false;
     layer->padding = padding;
     layer->input_dim = input_dim;
     layer->num_of_channels = num_of_channels;
