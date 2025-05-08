@@ -15,11 +15,14 @@ typedef struct {
     // Training-specific
     float *input_gradients;     // Gradient of input to propagate backward
     float *spike_gradients;     // Surrogate gradients for spikes
+
+    float *membrane_history;  // [time_steps][num_neurons]
+    int *spike_history;       // [time_steps][num_neurons]
 } SpikingLayer;
 
 void spiking_initialize(SpikingLayer *layer, size_t num_neurons, ModelBase **neuron_models);
-void spiking_forward(void *self, float *input, size_t input_size);
-float* spiking_backward(void *self, float *gradients);
+void spiking_forward(void *self, float *input, size_t input_size, size_t time_step);
+float* spiking_backward(void *self, float *gradients, size_t time_step);
 void spiking_update_weights(void *self, float learning_rate); // If needed for trainable weights
 void spiking_free(SpikingLayer *layer);
 void spiking_reset_spike_counts(void *self);

@@ -11,6 +11,9 @@ typedef struct {
     float beta;
     int spiked;
     int spike_count;
+
+    float* membrane_potential_history;  // For spiking layers
+    int* spike_history;                 // For spiking layers
 } LIFNeuron;
 
 void lif_initialize(LIFNeuron *neuron, float v_rest, float threshold, float v_reset, float beta);

@@ -8,7 +8,7 @@ void flatten_initialize(FlattenLayer *layer, size_t input_size) {
     layer->base.layer_type = LAYER_FLATTEN;
     layer->base.num_inputs = input_size;
     layer->base.is_spiking = false;
-    layer->base.inputs = NULL;
+    layer->base.inputs = (float*)malloc(input_size * sizeof(float));
     layer->base.forward = flatten_forward;
     layer->base.backward = flatten_backward;
     layer->base.zero_grad = flatten_zero_grad;  // Assign function pointer
@@ -18,24 +18,31 @@ void flatten_initialize(FlattenLayer *layer, size_t input_size) {
 
 }
 
-void flatten_forward(void *self, float *input, size_t input_size) {
+void flatten_forward(void *self, float *input, size_t input_size, size_t time_step) {
     FlattenLayer *layer = (FlattenLayer *)self;
-    layer->base.inputs = input;
 
-    //printf("Performing Flatten forward pass...\n");
+    memcpy(layer->base.inputs, input, input_size * sizeof(float));
 
+    // Copy input directly to output (flattening effect)
     for (size_t i = 0; i < input_size; i++) {
         layer->base.output[i] = input[i];
     }
+
+    // Store output for this time step
+    if (layer->base.output_history) {
+        memcpy(&layer->base.output_history[time_step * layer->base.output_size],
+             layer->base.output,
+             layer->base.output_size * sizeof(float));
+    }
 }
 
-// Backward pass for Flatten
-float* flatten_backward(void *self, float *gradients) {
+float* flatten_backward(void *self, float *gradients, size_t time_step) {
     FlattenLayer *layer = (FlattenLayer *)self;
     memcpy(layer->base.input_gradients, gradients, layer->base.output_size * sizeof(float));
 
     return layer->base.input_gradients;
 }
+
 
 void flatten_zero_grad(void *self) {
     FlattenLayer *layer = (FlattenLayer *)self;

@@ -20,7 +20,7 @@ ModelBase **initialize_neurons(const char *neuron_type, size_t num_neurons, stru
         float beta = json_object_get_double(json_object_object_get(neuron_config, "beta"));
         for (size_t i = 0; i < num_neurons; i++) {
             neurons[i] = (ModelBase *)malloc(sizeof(LIFNeuron));
-            lif_initialize((LIFNeuron *)neurons[i], 0.0f, 0.5f, 0.0f, beta);
+            lif_initialize((LIFNeuron *)neurons[i], 0.0f, 1.0f, 0.0f, beta);
         }
     }
     // rest neuron types etc... 

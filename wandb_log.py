@@ -2,8 +2,11 @@ import numpy as np
 import plotly.graph_objects as go
 import glob
 
+# Set epsilon threshold for near-zero filtering
+epsilon = 1e-5
+
 # Collect gradient files
-gradient_files = sorted(glob.glob("out/weight_grads/gradients_epoch_0_sample_*.txt"))
+gradient_files = sorted(glob.glob("out/weight_grads/gradients_epoch_*_sample_*.txt"))
 
 # Data structure to store gradients per layer
 layer_gradients = {}
@@ -25,7 +28,7 @@ for filename in gradient_files:
                 layer_gradients[current_layer] = []
         elif line:
             grad_value = float(line)
-            if grad_value != 0:  # Ignore zero gradients
+            if abs(grad_value) > epsilon:  # Ignore near-zero gradients
                 layer_gradients[current_layer].append((sample_id, grad_value))
 
 # Create interactive 3D scatter plots per layer
@@ -35,14 +38,14 @@ for layer, data in layer_gradients.items():
     gradients = data[:, 1]
 
     if len(gradients) == 0:
-        print(f"Skipping Layer {layer} (only zero gradients)")
+        print(f"Skipping Layer {layer} (only near-zero gradients)")
         continue
 
-    print(f"min gradient val: {min(gradients)}")
-    print(f"max gradient val: {max(gradients)}")
+    print(f"Layer {layer} - min gradient val: {min(gradients)}")
+    print(f"Layer {layer} - max gradient val: {max(gradients)}")
 
     # Define histogram bins
-    num_bins = 512 * 2 * 2
+    num_bins = 256
     hist_range = (min(gradients), max(gradients))
     hist, bins = np.histogram(gradients, bins=num_bins, range=hist_range)
 

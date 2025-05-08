@@ -18,8 +18,8 @@ void free_mse_count_loss(MSECountLoss* loss) {
 }
 
 void generate_target_counts(MSECountLoss* loss, int* labels) {
-    float correct_target = loss->num_steps * loss->correct_rate;
-    float incorrect_target = loss->num_steps * loss->incorrect_rate;
+    float correct_target = loss->num_steps * loss->correct_rate; 
+    float incorrect_target = loss->num_steps * loss->incorrect_rate;  
     
     for (int b = 0; b < loss->batch_size; b++) {
         for (int n = 0; n < loss->num_neurons; n++) {
@@ -37,9 +37,9 @@ float compute_mse_loss(MSECountLoss* loss) {
     int total_elements = loss->batch_size * loss->num_neurons;
     
     for (int i = 0; i < total_elements; i++) {
-        float diff = loss->spike_counts[i] - loss->target_counts[i];
+        float diff = (loss->spike_counts[i] - loss->target_counts[i]) / loss->num_steps;
         total_loss += diff * diff;
     }
     
-    return total_loss / (total_elements * loss->num_steps);
+    return total_loss / total_elements;  // Remove division by num_steps here
 }

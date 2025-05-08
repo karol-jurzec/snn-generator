@@ -26,7 +26,7 @@ typedef struct {
 } NMNISTDataset;
 
 // Function declarations
-NMNISTDataset *load_nmnist_dataset(const char *data_dir, size_t max_samples, bool stabilize);
+NMNISTDataset *load_nmnist_dataset(const char *data_dir, size_t max_samples, bool stabilize, int num_classes);
 NMNISTSample load_nmnist_sample(const char *file_path, int label, bool stabilize);
 void free_nmnist_dataset(NMNISTDataset *dataset);
 float *convert_events_to_input(const NMNISTEvent *events, size_t num_events, int time_bins, int height, int width, unsigned int max_time);

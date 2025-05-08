@@ -13,6 +13,7 @@ void spiking_initialize(SpikingLayer *layer, size_t num_neurons, ModelBase **neu
     layer->base.num_inputs= num_neurons;
     layer->num_neurons = num_neurons;
     layer->neurons = (ModelBase **)malloc(num_neurons * sizeof(ModelBase *));
+    layer->base.inputs = (float *)malloc(num_neurons * sizeof(float));
     layer->base.output = (float *)malloc(num_neurons * sizeof(float));
     layer->base.output_size = num_neurons;
 
@@ -24,30 +25,38 @@ void spiking_initialize(SpikingLayer *layer, size_t num_neurons, ModelBase **neu
     layer->base.input_gradients = (float *)malloc(num_neurons * sizeof(float));
 }
 
-void spiking_forward(void *self, float *input, size_t input_size) {
-    //printf("Input for spiking layer:\n");
-
-    //for(int i = 0; i < 10; ++i) {
-    //    printf("input[%d] = %f\n", i, input[i]);
-    //}
-
-    //printf("Performing Spiking Layer forward pass...\n");
-    SpikingLayer* layer = (SpikingLayer*)self;
-    layer->base.inputs = input;
+void spiking_forward(void *self, float *input, size_t input_size, size_t time_step) {
+    SpikingLayer *layer = (SpikingLayer *)self;
+    
+    // Store input for this time step
+    memcpy(layer->base.inputs, input, input_size * sizeof(float));
 
     for (size_t i = 0; i < layer->num_neurons; i++) {
         layer->neurons[i]->update_neuron(layer->neurons[i], input[i]);
-        layer->base.output[i] = (layer->neurons[i]->spiked == 1) ? 1.0f : 0.0f;
-    }
 
+        // Store output
+        layer->base.output[i] = layer->neurons[i]->spiked;
+        
+        // Store membrane potential and spikes for BPTT
+        if (layer->membrane_history) {
+           layer->membrane_history[time_step * layer->num_neurons + i] = layer->neurons[i]->v;
+           layer->spike_history[time_step * layer->num_neurons + i] = layer->neurons[i]->spiked;
+        }
+    }
 }
 
 // Backward pass for Spiking Layer
-float* spiking_backward(void *self, float *gradients) {
+float* spiking_backward(void *self, float *gradients, size_t time_step) {
     SpikingLayer *layer = (SpikingLayer *)self;
 
     for (size_t i = 0; i < layer->num_neurons; i++) {
-        LIFNeuron* neuron = (LIFNeuron*)layer->neurons[i];
+        LIFNeuron *neuron = (LIFNeuron *)layer->neurons[i];
+        
+        // Load membrane potential for this time step
+        if (layer->membrane_history) {
+            neuron->base.v = layer->membrane_history[time_step * layer->num_neurons + i];
+            neuron->base.spiked = layer->spike_history[time_step * layer->num_neurons + i];
+        }
         
         // ATAN surrogate gradient (matches snnTorch default)
         float spike_derivative = 1.0f / (1.0f + neuron->base.v * neuron->base.v);

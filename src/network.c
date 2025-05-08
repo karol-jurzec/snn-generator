@@ -4,17 +4,19 @@
 #include <string.h>
 
 #include "../include/network.h"
+#include "../include/layers/maxpool2d_layer.h"
 #include "../include/utils/nmnist_loader.h"
 #include "../include/utils/network_logger.h"
 #include "../include/models/lif_neuron.h"
 #include "../include/layers/spiking_layer.h"
+#include "../include/utils/mse_count_loss.h"
 
-#define LEARNING_RATE 0.01
+//#define LEARNING_RATE 0.01
 #define EPOCHS 10
-#define BATCH_SIZE 16
+#define BATCH_SIZE 8
+#define TIME_BINS 32
 
 #define ENABLE_DEBUG_LOG
-
 
 // Create a new network with a given number of layers
 Network *create_network(size_t num_layers) {
@@ -37,18 +39,86 @@ void add_layer(Network *network, LayerBase *layer, size_t index) {
     }
 }
 
-// Perform forward propagation through the network
-void forward(Network *network, float *input, size_t input_size) {
+// Network-wide functions for BPTT
+// TODO: change shape of input to [T][B][H * W] 
+// T - nubmer of time steps
+// B - number of batches 
+// H * W - size of single time_step input (in this case H is height and W is widht)
+// TODO: process forward and backward through layers in batches
+
+
+void forward(Network *network, float *input, size_t input_size, int time_step) {
     float *current_input = input;
     size_t current_input_size = input_size;
 
     for (size_t i = 0; i < network->num_layers; i++) {
         LayerBase *layer = network->layers[i];
-        layer->forward(layer, current_input, current_input_size);
+        
+        // Store the previous output if needed
+        // TODO: check why this makes a segmentation fault 
 
-        // Update current input to the output of the current layer
-        current_input = layer->output; // Correctly reference the layer's output
-        current_input_size = layer->output_size; // Update input size for the next layer
+        if (time_step > 0 && layer->output_history != NULL) {
+            memcpy(&layer->output_history[(time_step-1)*layer->output_size], 
+                   layer->output, 
+                   layer->output_size * sizeof(float));
+        }
+        
+        layer->forward(layer, current_input, current_input_size, time_step);
+        
+        current_input = layer->output;
+        current_input_size = layer->output_size;
+    }
+}
+
+float* backward(Network *network, float *gradients, int time_step) {
+    float *current_gradients = gradients;
+    
+    for (size_t j = network->num_layers; j-- > 0;) {
+        LayerBase *layer = network->layers[j];
+
+        float mx_value = 0.0f; 
+        for(int i = 0; i < layer->output_size; ++i) {
+            if(fabs(current_gradients[i]) > mx_value) {
+                mx_value = fabs(current_gradients[i]);
+            }
+        }
+
+        printf("Max value for layer %d: %f\n", j, mx_value);
+        
+        // If this layer has temporal states, load them
+        if (layer->output_history != NULL) {
+            memcpy(layer->output, 
+                   &layer->output_history[time_step * layer->output_size],
+                   layer->output_size * sizeof(float));
+        }
+        
+        current_gradients = layer->backward(layer, current_gradients, time_step);
+    }
+    
+    return current_gradients;
+}
+
+float compute_loss(Network *network, MSECountLoss *loss_fn, int *labels, int batch_size) {
+    SpikingLayer *output_layer = (SpikingLayer *)network->layers[network->num_layers-1];
+    
+    // Collect spike counts for all samples in batch
+    for (int b = 0; b < batch_size; b++) {
+        for (size_t n = 0; n < output_layer->num_neurons; n++) {
+            LIFNeuron *neuron = (LIFNeuron *)output_layer->neurons[n];
+            loss_fn->spike_counts[b * output_layer->num_neurons + n] = (float)neuron->spike_count;
+        }
+    }
+    
+    generate_target_counts(loss_fn, labels);
+    return compute_mse_loss(loss_fn);
+}
+
+void update_weights(Network *network, float learning_rate) {
+    for (size_t i = 0; i < network->num_layers; i++) {
+        LayerBase *layer = network->layers[i];
+        if (layer->update_weights) {
+            layer->update_weights(layer, learning_rate);
+        }
     }
 }
 
@@ -59,26 +129,6 @@ void free_network(Network *network) {
     }
     free(network->layers);
     free(network);
-}
-
-
-float calculate_loss(float *output, int label, size_t output_size) {
-    // Cross-entropy loss
-    float loss = 0.0f;
-    for (size_t i = 0; i < output_size; i++) {
-        float target = (i == label) ? 1.0f : 0.0f;
-        loss += -target * log(output[i]);
-    }
-    return loss;
-}
-
-void update_weights(Network *network, float learning_rate) {
-    for (size_t i = 0; i < network->num_layers; i++) {
-        LayerBase *layer = network->layers[i];
-        if (layer->update_weights) {
-            layer->update_weights(layer, learning_rate);
-        }
-    }
 }
 
 // Compute spike probabilities using softmax
@@ -115,140 +165,188 @@ void zero_grads(Network* model) {
     }
 }
 
-void train(Network *network, NMNISTDataset *dataset) {
-    printf("Starting training...\n");
-    //const int TIME_BINS = 311;
-    const int TIME_BINS = 8;
+// Reset all layer states between batches
+void reset_layer_states(Network *network) {
+    for (size_t i = 0; i < network->num_layers; i++) {
+        LayerBase *layer = network->layers[i];
+        if (layer->is_spiking) {
+            SpikingLayer *slayer = (SpikingLayer *)layer;
+            for (size_t n = 0; n < slayer->num_neurons; n++) {
+                LIFNeuron *neuron = (LIFNeuron *)slayer->neurons[n];
+                neuron->spike_count = 0;
+                neuron->base.v = 0.0f;
+            }
+        }
+        
+        // Clear temporal histories if they exist
+        if (layer->output_history) {
+            memset(layer->output_history, 0, layer->output_size * TIME_BINS * sizeof(float));
+        }
+    }
+}
 
-    // Arrays to store batch data
-    float** batch_probabilities = (float**)malloc(BATCH_SIZE * sizeof(float*));
+// Initialize network with temporal buffers
+void initialize_network_with_bptt(Network *network, int time_steps) {
+    for (size_t i = 0; i < network->num_layers; i++) {
+        LayerBase *layer = network->layers[i];
+        layer->time_steps = time_steps;
+        
+        // Allocate history buffers based on layer type
+        if (layer->is_spiking) {
+            SpikingLayer *slayer = (SpikingLayer *)layer;
+            slayer->membrane_history = (float*)malloc(time_steps * slayer->num_neurons * sizeof(float));
+            slayer->spike_history = (int*)malloc(time_steps * slayer->num_neurons * sizeof(int));
+        }
+        
+        // Allocate output history for all layers
+        layer->output_history = (float*)malloc(time_steps * layer->output_size * sizeof(float));
+        
+        // Special case for MaxPool
+        if (layer->layer_type == LAYER_MAXPOOL2D) {
+            MaxPool2DLayer *mpool = (MaxPool2DLayer *)layer;
+            mpool->max_indices_history = (size_t*)malloc(time_steps * mpool->base.output_size * sizeof(size_t));
+        }
+    }
+}
+
+void train(Network *network, NMNISTDataset *dataset) {
+    printf("Starting training with BPTT...\n");
+    const float LEARNING_RATE = 0.02f;  // Matching PyTorch's 2e-2
+
+    // Initialize loss function (matches PyTorch's parameters)
+    MSECountLoss mse_loss;
+    init_mse_count_loss(&mse_loss, BATCH_SIZE, 10, TIME_BINS, 0.8f, 0.2f);
+    initialize_network_with_bptt(network, TIME_BINS);
+
+    // Batch buffers
     int* batch_labels = (int*)malloc(BATCH_SIZE * sizeof(int));
-    float** batch_gradients = (float**)malloc(BATCH_SIZE * sizeof(float*));
+    float** batch_inputs = (float**)malloc(BATCH_SIZE * sizeof(float*));
+    
+    // For tracking performance
+    float epoch_loss = 0.0f;
+    int correct_predictions = 0;
+    size_t total_samples = 0;
 
     for (int epoch = 0; epoch < EPOCHS; epoch++) {
-        float epoch_loss = 0.0;
-        size_t total_samples = 0;
+        epoch_loss = 0.0f;
+        correct_predictions = 0;
+        total_samples = 0;
 
         for (size_t batch_start = 0; batch_start < dataset->num_samples; batch_start += BATCH_SIZE) {
             size_t batch_end = batch_start + BATCH_SIZE;
             if (batch_end > dataset->num_samples) batch_end = dataset->num_samples;
             size_t actual_batch_size = batch_end - batch_start;
 
+            // Reset gradients and temporal states
             zero_grads(network);
+            reset_layer_states(network);
 
-            // Process each sample in batch
-            for (size_t batch_idx = 0; batch_idx < actual_batch_size; batch_idx++) {
+            // --- PHASE 1: Forward pass (all time steps) ---
+            for (int batch_idx = 0; batch_idx < actual_batch_size; batch_idx++) {
                 size_t sample_idx = batch_start + batch_idx;
                 NMNISTSample *sample = &dataset->samples[sample_idx];
-
-                // Convert events to input format
+                
+                // Convert events to input frames (all time steps)
                 int max_time = sample->events[sample->num_events - 1].timestamp;
-                float *input = convert_events_to_input(
-                    sample->events, sample->num_events, TIME_BINS, 34, 34, max_time);
+                batch_inputs[batch_idx] = convert_events_to_input(sample->events, sample->num_events,
+                                                                TIME_BINS, 34, 34, max_time);
+                batch_labels[batch_idx] = sample->label;
+            }
 
-                //print_frame(input, 34, 34);
+            // Process all time steps for the entire batch
+            for (int t = 0; t < TIME_BINS; t++) {
+                for (int batch_idx = 0; batch_idx < actual_batch_size; batch_idx++) {
+                    // In your train function, before forward pass:
+                    float *frame = &batch_inputs[batch_idx][t * 34 * 34 * 2];
 
-                size_t input_size_per_bin = 34 * 34;
-
-                // Reset spike counts for all layers
-                for (size_t l = 0; l < network->num_layers; l++) {
-                    if (network->layers[l]->is_spiking == true) {
-                        network->layers[l]->reset_spike_counts(network->layers[l]);
-                    }
-                }
-
-                // Process each time bin sequentially
-                for (int t = 0; t < TIME_BINS; t++) {
-                    float *frame = &input[t * input_size_per_bin];
-                    network->layers[0]->forward(network->layers[0], frame, input_size_per_bin);
-                    for (size_t j = 1; j < network->num_layers; j++) {
-                        network->layers[j]->forward(network->layers[j], 
-                                                   network->layers[j-1]->output,
-                                                   network->layers[j-1]->output_size);
-                    }
+                    forward(network, frame, 34*34*2, t);
 
                     #ifdef ENABLE_DEBUG_LOG
-                        log_spikes(network, epoch + 1, total_samples + batch_idx, t);
+                    if (epoch == EPOCHS-1) {
+                        log_spikes(network, epoch+1, batch_start+batch_idx, t, batch_labels[batch_idx]);
+                    }
                     #endif
                 }
+            }
 
-                // Get output spike counts
-                SpikingLayer *output_layer = (SpikingLayer *)network->layers[network->num_layers - 1];
-                if (output_layer->num_neurons == 0 || output_layer->neurons == NULL) {
-                    fprintf(stderr, "Error: Output layer neurons not initialized.\n");
-                    free(input);
-                    continue;
-                }
+            // --- PHASE 2: Compute loss ---
+            SpikingLayer *output_layer = (SpikingLayer *)network->layers[network->num_layers-1];
+            float batch_loss = compute_loss(network, &mse_loss, batch_labels, actual_batch_size);
+            epoch_loss += batch_loss;
 
-                float spike_counts[output_layer->num_neurons];
+            // Calculate accuracy
+            for (int batch_idx = 0; batch_idx < actual_batch_size; batch_idx++) {
+                int predicted_label = -1;
+                float max_spikes = -1.0f;
+                
                 for (size_t n = 0; n < output_layer->num_neurons; n++) {
                     LIFNeuron *neuron = (LIFNeuron *)output_layer->neurons[n];
-                    spike_counts[n] = (float)neuron->spike_count;
+                    if ((float)neuron->spike_count > max_spikes) {
+                        max_spikes = (float)neuron->spike_count;
+                        predicted_label = (int)n;
+                    }
                 }
-
-                // Store probabilities and labels for batch
-                batch_probabilities[batch_idx] = (float*)malloc(output_layer->num_neurons * sizeof(float));
-                compute_probabilities(spike_counts, output_layer->num_neurons, batch_probabilities[batch_idx]);
-                batch_labels[batch_idx] = sample->label;
-
-                // Calculate loss
-                epoch_loss += -log(batch_probabilities[batch_idx][sample->label]);
+                
+                if (predicted_label == batch_labels[batch_idx]) {
+                    correct_predictions++;
+                }
                 total_samples++;
-
-                free(input);
             }
 
-            // Compute average gradients across batch 
-            // !!!!! HARDOCDED 10
-            float* avg_gradients = (float*)calloc(10, sizeof(float));
-            for (size_t batch_idx = 0; batch_idx < actual_batch_size; batch_idx++) {
-                // Compute gradients for each sample
-                batch_gradients[batch_idx] = (float*)malloc(10 * sizeof(float));
-                for (size_t k = 0; k < 10; k++) {
-                    
-                    // With a surrogate (e.g., sigmoid derivative):
-                    float surrogate_grad = 1.0f / (1.0f + fabs(batch_probabilities[batch_idx][k] - (k == batch_labels[batch_idx] ? 1.0f : 0.0f)));
-                    batch_gradients[batch_idx][k] = surrogate_grad * (batch_probabilities[batch_idx][k] - (k == batch_labels[batch_idx]  ? 1.0f : 0.0f));
-                    avg_gradients[k] += batch_gradients[batch_idx][k];
+            // --- PHASE 3: Backward pass (reverse time) ---
+            float* output_gradients = (float*)calloc(output_layer->num_neurons, sizeof(float));
+            
+            // Get initial gradients from loss function
+            for (int batch_idx = 0; batch_idx < actual_batch_size; batch_idx++) {
+                for (size_t n = 0; n < output_layer->num_neurons; n++) {
+                    float output = mse_loss.spike_counts[batch_idx * output_layer->num_neurons + n];
+                    float target = mse_loss.target_counts[batch_idx * output_layer->num_neurons + n];
+                    output_gradients[n] += 2.0f * (output - target) / 
+                                         (actual_batch_size * output_layer->num_neurons * TIME_BINS);
                 }
             }
 
-            // Average the gradients
-            for (size_t k = 0; k < 10; k++) {
-                avg_gradients[k] /= actual_batch_size;
+            for(int i = 0; i < 10; ++i) {
+                float val = output_gradients[i];
+                int v = 0;
             }
 
-            // Backward pass with averaged gradients
-            float* current_gradients = avg_gradients;
-
-            for (size_t j = network->num_layers; j-- > 0;) {
-                current_gradients = network->layers[j]->backward(network->layers[j], current_gradients);
+            // Backpropagate through time
+            for (int t = TIME_BINS-1; t >= 0; t--) {
+                for (int batch_idx = 0; batch_idx < actual_batch_size; batch_idx++) {
+                    backward(network, output_gradients, t);
+                }
             }
+            free(output_gradients);
 
-            // Update weights after processing entire batch
+            // --- PHASE 4: Update weights ---
             update_weights(network, LEARNING_RATE);
 
+            // Free batch inputs
+            for (int batch_idx = 0; batch_idx < actual_batch_size; batch_idx++) {
+                free(batch_inputs[batch_idx]);
+            }
+
+            printf("Epoch %d, Batch %d/%d, Loss: %.4f, Accuracy: %.2f%%\n",
+                  epoch+1, (int)(batch_start/BATCH_SIZE)+1, 
+                  (int)(dataset->num_samples/BATCH_SIZE),
+                  batch_loss/actual_batch_size,
+                  100.0f * correct_predictions / total_samples);
             
+            log_gradients(network, epoch, batch_start);
+            log_weights(network, epoch, batch_start);
         }
 
-        #ifdef ENABLE_DEBUG_LOG
-            log_gradients(network, (epoch + 1),  0);
-            log_weights(network, epoch + 1, 0);
-        #endif
-
-        printf("Epoch %d/%d, Loss: %.4f\n", epoch + 1, EPOCHS, epoch_loss / total_samples);
+        float avg_loss = epoch_loss / total_samples;
+        float accuracy = 100.0f * ((float)correct_predictions / total_samples);
+        printf("Epoch %d/%d, Avg Loss: %.4f, Accuracy: %.2f%%\n",
+              epoch+1, EPOCHS, avg_loss, accuracy);
     }
 
-    // Free batch memory
-    for (size_t batch_idx = 0; batch_idx < BATCH_SIZE; batch_idx++) {
-        free(batch_probabilities[batch_idx]);
-        free(batch_gradients[batch_idx]);
-    }
-    free(batch_probabilities);
+    // Cleanup
+    free_mse_count_loss(&mse_loss);
     free(batch_labels);
-    free(batch_gradients);
-    //free(avg_gradients);
-
+    free(batch_inputs);
     printf("Training complete!\n");
 }
 

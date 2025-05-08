@@ -8,7 +8,9 @@
         "spiking_layer.h": "c",
         "cmath": "c",
         "stb_image_write.h": "c",
-        "nmnist_loader.h": "c"
+        "nmnist_loader.h": "c",
+        "json.h": "c",
+        "maxpool2d_layer.h": "c"
     },
 "C_Cpp.errorSquiggles": "disabled"
 }

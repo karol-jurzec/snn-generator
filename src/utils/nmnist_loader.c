@@ -101,7 +101,12 @@ NMNISTSample load_nmnist_sample(const char *file_path, int label, bool stabilize
     return sample;
 }
 
-NMNISTDataset *load_nmnist_dataset(const char *data_dir, size_t max_samples, bool stabilize) {
+NMNISTDataset *load_nmnist_dataset(const char *data_dir, size_t max_samples, bool stabilize, int num_classes) {
+    if (num_classes < 1 || num_classes > 10) {
+        printf("Error: num_classes must be between 1 and 10\n");
+        return NULL;
+    }
+
     NMNISTDataset *dataset = (NMNISTDataset *)malloc(sizeof(NMNISTDataset));
     if (!dataset) {
         printf("Error: Memory allocation for NMNIST dataset failed\n");
@@ -118,8 +123,8 @@ NMNISTDataset *load_nmnist_dataset(const char *data_dir, size_t max_samples, boo
     SamplePath *all_paths = NULL;
     size_t total_paths = 0;
 
-    // First pass: Collect all file paths
-    for (int digit = 0; digit < 10; digit++) {
+    // Collect file paths for the selected number of classes
+    for (int digit = 0; digit < num_classes; digit++) {
         char digit_dir[256];
         snprintf(digit_dir, sizeof(digit_dir), "%s/%d", data_dir, digit);
 
@@ -161,6 +166,7 @@ NMNISTDataset *load_nmnist_dataset(const char *data_dir, size_t max_samples, boo
     free(all_paths);
     return dataset;
 }
+
 
 // Function to convert NMNIST events to discretized input
 float *convert_events_to_input(const NMNISTEvent *events, size_t num_events, int time_bins, int height, int width, unsigned int max_time) {

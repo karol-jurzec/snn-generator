@@ -1,4 +1,5 @@
 import os
+import glob
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -40,7 +41,15 @@ def plot_spike_raster(layer_path, layer_num, sample, epoch):
     plt.close()
 
 def visualize_spikes(sample, epoch):
-    base_path = f"out/spikes_outputs/sample_{sample:02d}_epoch_{epoch:02d}"
+    
+
+    # Construct base pattern with wildcard for label
+    base_pattern = f"out/spikes_outputs/sample_{sample:02d}_epoch_{epoch:02d}_label_*"
+
+    # Search for matching directories or files
+    matches = glob.glob(base_pattern)
+    base_path = matches[0]
+
     if not os.path.exists(base_path):
         print(f"Path {base_path} does not exist.")
         return
@@ -52,4 +61,4 @@ def visualize_spikes(sample, epoch):
             print(f"Processing {layer_path}")
             plot_spike_raster(layer_path, layer_num, sample, epoch)
 
-visualize_spikes(sample=150, epoch=1)
+visualize_spikes(sample=31, epoch=1)

@@ -25,7 +25,7 @@ void log_weights(Network *network, int epoch, int batch) {
 }
 
 void log_gradients(Network *network, int epoch, int sample) {
-    char filename[50];
+    char filename[100];
     snprintf(filename, sizeof(filename), "out/weight_grads/gradients_epoch_%d_sample_%d.txt", epoch, sample);
 
     FILE *file = fopen(filename, "w");
@@ -109,9 +109,9 @@ void log_membranes(Network *network, int epoch, int sample, int t) {
 
 }
 
-void log_spikes(Network *network, int epoch, int sample, int t) {
+void log_spikes(Network *network, int epoch, int sample, int t, int label) {
     char base_path[100];
-    snprintf(base_path, sizeof(base_path), "out/spikes_outputs/sample_%02d_epoch_%02d", sample, epoch);
+    snprintf(base_path, sizeof(base_path), "out/spikes_outputs/sample_%02d_epoch_%02d_label_%02d", sample, epoch, label);
     create_directory("out/spikes_outputs");
     create_directory(base_path);
 

@@ -5,8 +5,8 @@
 #include <stdbool.h> 
 
 // Macro for polymorphic forward function in layers
-#define LAYER_FORWARD_FUNC(name) void (*name)(void *self, float *input, size_t input_size)
-#define LAYER_BACKWARD_FUNC(name) float* (*name)(void *self, float *gradients)
+#define LAYER_FORWARD_FUNC(name) void (*name)(void *self, float *input, size_t input_size, size_t time_step)
+#define LAYER_BACKWARD_FUNC(name) float* (*name)(void *self, float *gradients, size_t time_step)
 #define UPDATE_WEIGHTS_FUNC(name) void (*name)(void *self, float learning_rate)
 #define RESET_SPIKE_COUNTS_FUNC(name) void (*name)(void *self) 
 #define ZERO_GRAD_FUNC(name) void (*name)(void *self)
@@ -29,7 +29,10 @@ typedef struct {
     RESET_SPIKE_COUNTS_FUNC(reset_spike_counts);  // Reset spike counts function pointer for spiking layers
     ZERO_GRAD_FUNC(zero_grad);  // Zero gradients function pointer for layers
 
-    float *output;                // Output buffer for layers
+    float *output;           // Output buffer for layers
+    float* output_history;  // Array of outputs for all time steps
+    float* grad_history;    // Array of gradients for all time steps
+    size_t time_steps;      // Number of time steps (TIME_BINS)
 
     float *input_gradients;       // Input gradients for backpropagation
     float *weight_gradients; // Gradient of weights

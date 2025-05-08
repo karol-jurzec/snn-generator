@@ -27,8 +27,8 @@ typedef struct {
 void he_kaiming_uniform_init(float *weights, size_t size, int in_channels, int kernel_size);
 
 void conv2d_initialize(Conv2DLayer *layer, int in_channels, int out_channels, int kernel_size, int stride, int padding, int input_dim);
-void conv2d_forward(void *self, float *input, size_t input_size);
-float* conv2d_backward(void *self, float *gradients);
+void conv2d_forward(void *self, float *input, size_t input_size, size_t time_step);
+float* conv2d_backward(void *self, float *gradients, size_t time_step);
 void conv2d_update_weights(void *self, float learning_rate);
 void conv2d_free(Conv2DLayer *layer);
 void conv2d_zero_grad(void *self);

@@ -23,6 +23,7 @@ void linear_initialize(LinearLayer *layer, size_t in_features, size_t out_featur
     layer->base.zero_grad = linear_zero_grad;  // Assign function pointer
     layer->base.update_weights = linear_update_weights;
     layer->base.num_inputs = in_features;
+    layer->base.inputs = (float*)malloc(in_features * sizeof(float));
     layer->in_features = in_features;
     layer->out_features = out_features;
 
@@ -44,11 +45,10 @@ void linear_initialize(LinearLayer *layer, size_t in_features, size_t out_featur
     layer->base.input_gradients = (float *)malloc(in_features * sizeof(float));
 }
 
-void linear_forward(void *self, float *input, size_t input_size) {
+void linear_forward(void *self, float *input, size_t input_size, size_t time_step) {
     LinearLayer *layer = (LinearLayer *)self;
-    layer->base.inputs = input;
-
-    //printf("Performing Linear forward pass...\n");
+    
+    memcpy(layer->base.inputs, input, input_size * sizeof(float));
 
     for (size_t o = 0; o < layer->out_features; o++) {
         float sum = 0.0f;
@@ -57,28 +57,40 @@ void linear_forward(void *self, float *input, size_t input_size) {
         }
         layer->base.output[o] = sum + layer->biases[o];
     }
+
+    // Store output for this time step
+    if (layer->base.output_history) {
+        memcpy(&layer->base.output_history[time_step * layer->out_features], 
+               layer->base.output, 
+               layer->out_features * sizeof(float));
+    }
 }
 
-// Backward pass for Linear Layer
-float* linear_backward(void *self, float *gradients) {
-    LinearLayer *layer = (LinearLayer *)self;
 
-    // Gradients for weights and biases
-    // memset(layer->base.weight_gradients, 0, sizeof(float) * layer->in_features * layer->out_features);
-    // memset(layer->base.bias_gradients, 0, sizeof(float) * layer->out_features);
+// Backward pass for Linear Layer
+float* linear_backward(void *self, float *gradients, size_t time_step) {
+    LinearLayer *layer = (LinearLayer *)self;
+    
+    // Load input for this time step
+    float* input = layer->base.inputs;
+    if (layer->base.output_history) {
+        input = &layer->base.output_history[time_step * layer->out_features];
+    }
+
+    // Zero input gradients for this time step
+    // memset(layer->base.input_gradients, 0, layer->in_features * sizeof(float));
 
     for (size_t i = 0; i < layer->out_features; i++) {
-        float checkVal = gradients[i];
+        // Accumulate weight gradients across time
         for (size_t j = 0; j < layer->in_features; j++) {
-            layer->base.weight_gradients[i * layer->in_features + j] += gradients[i] * layer->base.inputs[j];
+            layer->base.weight_gradients[i * layer->in_features + j] += gradients[i] * input[j];
         }
+        
+        // Accumulate bias gradients across time
         layer->base.bias_gradients[i] += gradients[i];
     }
 
-    // Input gradients
-    //layer->base.input_gradients = (float *)realloc(layer->base.input_gradients, layer->in_features * sizeof(float));
-    //memset(layer->base.input_gradients, 0, layer->in_features * sizeof(float));
-
+    // Compute input gradients (time-step specific)
     for (size_t j = 0; j < layer->in_features; j++) {
         for (size_t i = 0; i < layer->out_features; i++) {
             layer->base.input_gradients[j] += layer->base.weights[i * layer->in_features + j] * gradients[i];
@@ -91,10 +103,13 @@ float* linear_backward(void *self, float *gradients) {
 // Update weights for Linear Layer
 void linear_update_weights(void *self, float learning_rate) {
     LinearLayer *layer = (LinearLayer *)self;
-
+    
+    // Update weights
     for (size_t i = 0; i < layer->in_features * layer->out_features; i++) {
         layer->base.weights[i] -= learning_rate * layer->base.weight_gradients[i];
     }
+    
+    // Update biases
     for (size_t i = 0; i < layer->out_features; i++) {
         layer->biases[i] -= learning_rate * layer->base.bias_gradients[i];
     }
