@@ -11,3 +11,29 @@ void initialize_biases(float *biases, size_t size, int fan_in) {
         biases[i] = (2.0f * rand_val - 1.0f) * limit; // Scale to [-limit, limit]
     }
 }
+
+void im2col(float* data_im, int channels, int height, int width,
+    int kernel_size, int padding, int stride,
+    float* data_col, int output_h, int output_w) {
+int c, h, w;
+int col_index = 0;
+
+for (c = 0; c < channels; ++c) {
+for (int ky = 0; ky < kernel_size; ++ky) {
+    for (int kx = 0; kx < kernel_size; ++kx) {
+        for (h = 0; h < output_h; ++h) {
+            for (w = 0; w < output_w; ++w) {
+                int im_row = h * stride + ky - padding;
+                int im_col = w * stride + kx - padding;
+                int im_index = c * height * width + im_row * width + im_col;
+                if (im_row >= 0 && im_row < height && im_col >= 0 && im_col < width) {
+                    data_col[col_index++] = data_im[im_index];
+                } else {
+                    data_col[col_index++] = 0.0f;
+                }
+            }
+        }
+    }
+}
+}
+}

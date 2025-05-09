@@ -1,9 +1,15 @@
+OPENBLAS_INCLUDE = /ucrt64/include/openblas
+OPENBLAS_LIB = /ucrt64/lib
+
+OPENBLAS_INCLUDE = /mingw64/include/openblas
+OPENBLAS_LIB = /mingw64/lib
+
 # Compiler and Flags
 CC = gcc  
-CFLAGS = -Wall -Wextra -g -I$(INCLUDE_DIR) -I$(JSON_C_INCLUDE) 
+CFLAGS = -Wall -Wextra -g -I$(INCLUDE_DIR) -I$(JSON_C_INCLUDE) -I$(OPENBLAS_INCLUDE) -I$(OPENBLAS_INCLUDE)
 
-LDFLAGS = -L$(JSON_C_LIB)
-LDLIBS = -ljson-c -lpthread -lm
+LDFLAGS = -L$(JSON_C_LIB) -L$(OPENBLAS_LIB)    -L$(OPENBLAS_LIB)
+LDLIBS = -ljson-c -lpthread -lm -lopenblas
 
 # Directories
 SRC_DIR = src

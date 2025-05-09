@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
+#include <cblas.h>
 
 #include "../../include/utils/layer_utils.h" 
 #include "../../include/layers/conv2d_layer.h"
@@ -52,43 +53,39 @@ void conv2d_initialize(Conv2DLayer *layer, int in_channels, int out_channels, in
 
 void conv2d_forward(void *self, float *input, size_t input_size, size_t time_step) {
     Conv2DLayer *layer = (Conv2DLayer *)self;
-    size_t output_dim = calculate_output_dim(layer->input_dim, layer->kernel_size, layer->stride, layer->padding);
-    size_t output_size = layer->out_channels * output_dim * output_dim;
+    int output_dim = calculate_output_dim(layer->input_dim, layer->kernel_size, layer->stride, layer->padding);
+    int kernel_dim = layer->in_channels * layer->kernel_size * layer->kernel_size;
+    int num_outputs = output_dim * output_dim;
 
-
+    // Save input
     memcpy(layer->base.inputs, input, input_size * sizeof(float));
 
-    // Perform convolution
-    for (int oc = 0; oc < layer->out_channels; oc++) {
-        for (size_t oy = 0; oy < output_dim; oy++) {
-            for (size_t ox = 0; ox < output_dim; ox++) {
-                float sum = 0.0f;
-                for (int ic = 0; ic < layer->in_channels; ic++) {
-                    for (int ky = 0; ky < layer->kernel_size; ky++) {
-                        for (int kx = 0; kx < layer->kernel_size; kx++) {
-                            size_t ix = ox * layer->stride + kx - layer->padding;
-                            size_t iy = oy * layer->stride + ky - layer->padding;
-                            if (ix < layer->input_dim && iy < layer->input_dim) {
-                                size_t input_idx = ic * layer->input_dim * layer->input_dim + iy * layer->input_dim + ix;
-                                size_t weight_idx = ((oc * layer->in_channels + ic) * layer->kernel_size + ky) * layer->kernel_size + kx;
-                                sum += input[input_idx] * layer->base.weights[weight_idx];
-                            }
-                        }
-                    }
-                }
-                size_t output_idx = oc * output_dim * output_dim + oy * output_dim + ox;
-                layer->base.output[output_idx] = sum + layer->biases[oc];
-            }
+    // im2col: convert input into column matrix
+    float* col = (float *)malloc(kernel_dim * num_outputs * sizeof(float));
+    im2col(input, layer->in_channels, layer->input_dim, layer->input_dim,
+           layer->kernel_size, layer->padding, layer->stride,
+           col, output_dim, output_dim);
+
+    // GEMM: output = W * col
+    // W: [out_channels x kernel_dim], col: [kernel_dim x num_outputs] => output: [out_channels x num_outputs]
+    cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
+                layer->out_channels, num_outputs, kernel_dim,
+                1.0f,
+                layer->base.weights, kernel_dim,
+                col, num_outputs,
+                0.0f,
+                layer->base.output, num_outputs);
+
+    // Add biases
+    for (int oc = 0; oc < layer->out_channels; ++oc) {
+        for (int i = 0; i < num_outputs; ++i) {
+            layer->base.output[oc * num_outputs + i] += layer->biases[oc];
         }
     }
 
-    // Store output for this time step
-    // if (layer->base.output_history) {
-    //     memcpy(&layer->base.output_history[time_step * output_size], 
-    //            layer->base.output, 
-    //            output_size * sizeof(float));
-    // }
+    free(col);
 }
+
 
 
 float* conv2d_backward(void *self, float *gradients, size_t time_step) {
