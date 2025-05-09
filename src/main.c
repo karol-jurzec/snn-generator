@@ -1,12 +1,21 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/time.h>
+
 
 #include "stdlib.h"
 
 #include "../include/tests.h"
 #include "../include/models/lif_neuron.h"
 #include "../include/models/izhikevich_neuron.h"
+
+static double now_seconds(void) {
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    return tv.tv_sec + tv.tv_usec * 1e-6;
+}
+
 
 int main(int argc, char *argv[]) {
 
@@ -56,7 +65,12 @@ int main(int argc, char *argv[]) {
 
 //nmnist_loader_test();
     srand(42);
+
+    double t0 = now_seconds();
     train_test();
+
+    double t1 = now_seconds();
+    printf("train_test() took %.6f seconds\n", t1 - t0);
     //discretization_test();
 
     //iris_classification_example();
