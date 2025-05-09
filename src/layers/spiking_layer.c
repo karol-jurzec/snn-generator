@@ -38,10 +38,10 @@ void spiking_forward(void *self, float *input, size_t input_size, size_t time_st
         layer->base.output[i] = layer->neurons[i]->spiked;
         
         // Store membrane potential and spikes for BPTT
-        if (layer->membrane_history) {
-           layer->membrane_history[time_step * layer->num_neurons + i] = layer->neurons[i]->v;
-           layer->spike_history[time_step * layer->num_neurons + i] = layer->neurons[i]->spiked;
-        }
+        // if (layer->membrane_history) {
+        //    layer->membrane_history[time_step * layer->num_neurons + i] = layer->neurons[i]->v;
+        //    layer->spike_history[time_step * layer->num_neurons + i] = layer->neurons[i]->spiked;
+        // }
     }
 }
 
@@ -53,10 +53,10 @@ float* spiking_backward(void *self, float *gradients, size_t time_step) {
         LIFNeuron *neuron = (LIFNeuron *)layer->neurons[i];
         
         // Load membrane potential for this time step
-        if (layer->membrane_history) {
-            neuron->base.v = layer->membrane_history[time_step * layer->num_neurons + i];
-            neuron->base.spiked = layer->spike_history[time_step * layer->num_neurons + i];
-        }
+        // if (layer->membrane_history) {
+        //     neuron->base.v = layer->membrane_history[time_step * layer->num_neurons + i];
+        //     neuron->base.spiked = layer->spike_history[time_step * layer->num_neurons + i];
+        // }
         
         // ATAN surrogate gradient (matches snnTorch default)
         float spike_derivative = 1.0f / (1.0f + neuron->base.v * neuron->base.v);

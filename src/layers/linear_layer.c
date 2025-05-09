@@ -33,8 +33,6 @@ void linear_initialize(LinearLayer *layer, size_t in_features, size_t out_featur
     layer->base.output = (float *)malloc(out_features * sizeof(float));
     layer->base.output_size = out_features;
 
-    srand(42);
-
     // weights and bias initalization
 
     he_kaiming_uniform_init_linear(layer->base.weights, in_features * out_features, in_features);
@@ -59,11 +57,11 @@ void linear_forward(void *self, float *input, size_t input_size, size_t time_ste
     }
 
     // Store output for this time step
-    if (layer->base.output_history) {
-        memcpy(&layer->base.output_history[time_step * layer->out_features], 
-               layer->base.output, 
-               layer->out_features * sizeof(float));
-    }
+    // if (layer->base.output_history) {
+    //     memcpy(&layer->base.output_history[time_step * layer->out_features], 
+    //            layer->base.output, 
+    //            layer->out_features * sizeof(float));
+    // }
 }
 
 
@@ -73,9 +71,9 @@ float* linear_backward(void *self, float *gradients, size_t time_step) {
     
     // Load input for this time step
     float* input = layer->base.inputs;
-    if (layer->base.output_history) {
-        input = &layer->base.output_history[time_step * layer->out_features];
-    }
+    // if (layer->base.output_history) {
+    //     input = &layer->base.output_history[time_step * layer->out_features];
+    // }
 
     // Zero input gradients for this time step
     // memset(layer->base.input_gradients, 0, layer->in_features * sizeof(float));

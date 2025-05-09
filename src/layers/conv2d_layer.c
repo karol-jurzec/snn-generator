@@ -40,8 +40,6 @@ void conv2d_initialize(Conv2DLayer *layer, int in_channels, int out_channels, in
     layer->base.num_weights = weight_size;
     layer->biases = (float *)malloc(out_channels * sizeof(float));
 
-    srand(42);
-
     // weights and bias initalization
     he_kaiming_uniform_init(layer->base.weights, weight_size, in_channels, kernel_size);
     initialize_biases(layer->biases, out_channels, in_channels * kernel_size * kernel_size);
@@ -85,11 +83,11 @@ void conv2d_forward(void *self, float *input, size_t input_size, size_t time_ste
     }
 
     // Store output for this time step
-    if (layer->base.output_history) {
-        memcpy(&layer->base.output_history[time_step * output_size], 
-               layer->base.output, 
-               output_size * sizeof(float));
-    }
+    // if (layer->base.output_history) {
+    //     memcpy(&layer->base.output_history[time_step * output_size], 
+    //            layer->base.output, 
+    //            output_size * sizeof(float));
+    // }
 }
 
 
@@ -100,9 +98,9 @@ float* conv2d_backward(void *self, float *gradients, size_t time_step) {
 
     // Load input for this time step
     float* input = layer->base.inputs;
-    if (layer->base.output_history) {
-        input = &layer->base.output_history[time_step * layer->base.output_size];
-    }
+    // if (layer->base.output_history) {
+    //     input = &layer->base.output_history[time_step * layer->base.output_size];
+    // }
 
     // Zero input gradients for this time step
     // memset(layer->base.input_gradients, 0, layer->input_dim * layer->input_dim * layer->in_channels * sizeof(float));

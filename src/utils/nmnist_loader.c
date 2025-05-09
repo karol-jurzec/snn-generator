@@ -107,6 +107,12 @@ NMNISTDataset *load_nmnist_dataset(const char *data_dir, size_t max_samples, boo
         return NULL;
     }
 
+    size_t max_per_class = max_samples / num_classes;
+    if (max_per_class == 0) {
+        printf("Error: max_samples is too small for the number of classes\n");
+        return NULL;
+    }
+
     NMNISTDataset *dataset = (NMNISTDataset *)malloc(sizeof(NMNISTDataset));
     if (!dataset) {
         printf("Error: Memory allocation for NMNIST dataset failed\n");
@@ -120,10 +126,8 @@ NMNISTDataset *load_nmnist_dataset(const char *data_dir, size_t max_samples, boo
         exit(EXIT_FAILURE);
     }
 
-    SamplePath *all_paths = NULL;
-    size_t total_paths = 0;
+    dataset->num_samples = 0;
 
-    // Collect file paths for the selected number of classes
     for (int digit = 0; digit < num_classes; digit++) {
         char digit_dir[256];
         snprintf(digit_dir, sizeof(digit_dir), "%s/%d", data_dir, digit);
@@ -134,36 +138,49 @@ NMNISTDataset *load_nmnist_dataset(const char *data_dir, size_t max_samples, boo
             continue;
         }
 
+        // Collect all .bin files for this class
+        SamplePath *class_paths = NULL;
+        size_t class_count = 0;
+
         struct dirent *entry;
         while ((entry = readdir(dir)) != NULL) {
             if (strstr(entry->d_name, ".bin")) {
-                all_paths = realloc(all_paths, (total_paths + 1) * sizeof(SamplePath));
-                snprintf(all_paths[total_paths].path, sizeof(all_paths[total_paths].path),
+                class_paths = realloc(class_paths, (class_count + 1) * sizeof(SamplePath));
+                snprintf(class_paths[class_count].path, sizeof(class_paths[class_count].path),
                          "%s/%s", digit_dir, entry->d_name);
-                all_paths[total_paths].label = digit;
-                total_paths++;
+                class_paths[class_count].label = digit;
+                class_count++;
             }
         }
         closedir(dir);
+
+        // Shuffle this class's paths
+        for (size_t i = 0; i < class_count; i++) {
+            size_t j = rand() % class_count;
+            SamplePath tmp = class_paths[i];
+            class_paths[i] = class_paths[j];
+            class_paths[j] = tmp;
+        }
+
+        // Load up to max_per_class from this class
+        size_t samples_loaded = 0;
+        for (size_t i = 0; i < class_count && samples_loaded < max_per_class; i++) {
+            NMNISTSample sample = load_nmnist_sample(class_paths[i].path, class_paths[i].label, stabilize);
+            dataset->samples[dataset->num_samples++] = sample;
+            samples_loaded++;
+        }
+
+        free(class_paths);
     }
 
-    // Shuffle the paths
-    srand((unsigned int)time(NULL));
-    for (size_t i = 0; i < total_paths; i++) {
-        size_t j = rand() % total_paths;
-        SamplePath tmp = all_paths[i];
-        all_paths[i] = all_paths[j];
-        all_paths[j] = tmp;
+        // Shuffle the entire dataset
+    for (size_t i = 0; i < dataset->num_samples; i++) {
+        size_t j = rand() % dataset->num_samples;
+        NMNISTSample tmp = dataset->samples[i];
+        dataset->samples[i] = dataset->samples[j];
+        dataset->samples[j] = tmp;
     }
 
-    // Load up to max_samples
-    dataset->num_samples = 0;
-    for (size_t i = 0; i < total_paths && dataset->num_samples < max_samples; i++) {
-        NMNISTSample sample = load_nmnist_sample(all_paths[i].path, all_paths[i].label, stabilize);
-        dataset->samples[dataset->num_samples++] = sample;
-    }
-
-    free(all_paths);
     return dataset;
 }
 

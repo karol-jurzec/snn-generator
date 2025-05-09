@@ -84,11 +84,11 @@ void maxpool2d_forward(void *self, float *input, size_t input_size, size_t time_
         }
     }
 
-    if (layer->max_indices_history) {
-        memcpy(&layer->max_indices_history[time_step * layer->base.output_size],
-               layer->max_indices,
-               layer->base.output_size * sizeof(size_t));
-    }
+    // if (layer->max_indices_history) {
+    //     memcpy(&layer->max_indices_history[time_step * layer->base.output_size],
+    //            layer->max_indices,
+    //            layer->base.output_size * sizeof(size_t));
+    // }
 }
 
 float* maxpool2d_backward(void *self, float *gradients, size_t time_step) {
@@ -106,9 +106,9 @@ float* maxpool2d_backward(void *self, float *gradients, size_t time_step) {
 
     // Load max_indices for this time step
     size_t *max_indices = layer->max_indices;
-    if (layer->max_indices_history) {
-        max_indices = &layer->max_indices_history[time_step * layer->base.output_size];
-    }
+    // if (layer->max_indices_history) {
+    //     max_indices = &layer->max_indices_history[time_step * layer->base.output_size];
+    // }
 
     // Route gradients using max_indices
     for (size_t i = 0; i < layer->base.output_size; i++) {
@@ -118,10 +118,7 @@ float* maxpool2d_backward(void *self, float *gradients, size_t time_step) {
         }
     }
 
-    // Free old memory if allocated
-    if (layer->base.input_gradients) {
-        free(layer->base.input_gradients);
-    }
+    
     layer->base.input_gradients = new_gradients;
 
     return layer->base.input_gradients;

@@ -10,7 +10,11 @@
         "stb_image_write.h": "c",
         "nmnist_loader.h": "c",
         "json.h": "c",
-        "maxpool2d_layer.h": "c"
+        "maxpool2d_layer.h": "c",
+        "xutility": "c",
+        "mse_count_loss.h": "c",
+        "network_logger.h": "c",
+        "stdio.h": "c"
     },
 "C_Cpp.errorSquiggles": "disabled"
 }

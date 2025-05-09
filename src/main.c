@@ -55,6 +55,7 @@ int main(int argc, char *argv[]) {
    */
 
 //nmnist_loader_test();
+    srand(42);
     train_test();
     //discretization_test();
 

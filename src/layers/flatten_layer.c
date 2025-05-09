@@ -29,11 +29,11 @@ void flatten_forward(void *self, float *input, size_t input_size, size_t time_st
     }
 
     // Store output for this time step
-    if (layer->base.output_history) {
-        memcpy(&layer->base.output_history[time_step * layer->base.output_size],
-             layer->base.output,
-             layer->base.output_size * sizeof(float));
-    }
+    // if (layer->base.output_history) {
+    //     memcpy(&layer->base.output_history[time_step * layer->base.output_size],
+    //          layer->base.output,
+    //          layer->base.output_size * sizeof(float));
+    // }
 }
 
 float* flatten_backward(void *self, float *gradients, size_t time_step) {

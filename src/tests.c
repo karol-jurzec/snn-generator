@@ -370,7 +370,8 @@ void discretization_test() {
 
 
 void train_test() {
-    const char *network_config_path = "C:/Users/karol/Desktop/karol/agh/praca_snn/N-MNIST/Train/Train";   
+    const char *network_config_path_train = "C:/Users/karol/Desktop/karol/agh/praca_snn/data/NMNIST/Train";   
+    const char *network_config_path_test = "C:/Users/karol/Desktop/karol/agh/praca_snn/data/NMNIST/Test"; 
     const char *dataset_path = "torch_model.json";
 
     // Load the network
@@ -382,20 +383,23 @@ void train_test() {
     }
 
     // Load the NMNIST dataset
-    printf("Loading dataset from %s...\n", network_config_path);
-    NMNISTDataset *dataset = load_nmnist_dataset(network_config_path, 160, true, 10); // Load up to 160 samples
-    if (!dataset) {
-        printf("Error: Failed to load dataset.\n");
-        free_network(network);
-        return;
-    }
+    printf("Loading train dataset from %s...\n", network_config_path_train);
+    NMNISTDataset *dataset_train = load_nmnist_dataset(network_config_path_train, 240, true, 2); // Load up to 160 samples
 
     // Train the network
     printf("Training the network...\n");
-    train(network, dataset);
+    train(network, dataset_train);
 
+    printf("Loading test dataset from %s...\n", network_config_path_test);
+    NMNISTDataset *dataset_test = load_nmnist_dataset(network_config_path_test, 60, true, 2); // Load up to 160 samples
+
+
+    printf("Testing the network accuracy...\n");
+    test(network, dataset_test);  // Call after training
+    
     // Clean up
-    free_nmnist_dataset(dataset);
+    free_nmnist_dataset(dataset_test);
+    free_nmnist_dataset(dataset_train);
     free_network(network);
 
     printf("Training test completed successfully.\n");
@@ -1073,55 +1077,7 @@ void test_hor_vert_dataset(Network* net, float** images, int* labels, int num_sa
     }
 }
 
-// Test function
-void test(Network* net, float** images, int* labels, int num_samples) {
-    int correct = 0;
-    
-    for (int i = 0; i < num_samples; i++) {
-       // forward(net, images[i], 6 * 6);
-        
-        // Get output and apply softmax
-        float* output = net->layers[net->num_layers - 1]->output;
-        softmax(output, 3);
-        
-        // Get predicted class
-        int predicted = 0;
-        float max_prob = output[0];
-        for (int j = 1; j < 3; j++) {
-            if (output[j] > max_prob) {
-                max_prob = output[j];
-                predicted = j;
-            }
-        }
-        
-        if (predicted == labels[i]) {
-            correct++;
-        }
-    }
-    
-    printf("Accuracy: %.2f%%\n", (float)correct / num_samples * 100.0f);
-}
 
-void hor_vert_dataset() {
-    // Create dataset
-    float** images;
-    int* labels;
-    int num_samples;
-    create_dataset(&images, &labels, &num_samples);
-    
-    // Create network
-    Network* net = create_simple_net();
-    
-    // Train network
-    test_hor_vert_dataset(net, images, labels, num_samples, 10, 0.01f);
-    
-    // Test network
-    test(net, images, labels, num_samples);
-    
-    // Cleanup
-    free_network(net);
-    free_dataset(images, labels, num_samples);
-}
 
 
 
