@@ -40,6 +40,8 @@ void maxpool2d_initialize(MaxPool2DLayer *layer, int kernel_size, int stride, in
     // Function pointers
     layer->base.forward = maxpool2d_forward;
     layer->base.backward = maxpool2d_backward;
+    layer->base.zero_grad = maxpool2d_zero_grad;  // Assign function pointer
+
     layer->base.update_weights = NULL;
 }
 
@@ -124,7 +126,14 @@ float* maxpool2d_backward(void *self, float *gradients, size_t time_step) {
     return layer->base.input_gradients;
 }
 
-
+void maxpool2d_zero_grad(void *self) {
+    MaxPool2DLayer *layer = (MaxPool2DLayer *)self;
+    
+    // Zero out input gradients if they exist
+    if (layer->base.input_gradients) {
+        memset(layer->base.input_gradients, 0, layer->input_size * sizeof(float));
+    }
+}
 
 
 void maxpool2d_free(MaxPool2DLayer *layer) {

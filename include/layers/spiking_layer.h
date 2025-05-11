@@ -24,6 +24,7 @@ void spiking_initialize(SpikingLayer *layer, size_t num_neurons, ModelBase **neu
 void spiking_forward(void *self, float *input, size_t input_size, size_t time_step);
 float* spiking_backward(void *self, float *gradients, size_t time_step);
 void spiking_update_weights(void *self, float learning_rate); // If needed for trainable weights
+void spiking_zero_grad(void *self);
 void spiking_free(SpikingLayer *layer);
 void spiking_reset_spike_counts(void *self);
 

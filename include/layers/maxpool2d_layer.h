@@ -29,5 +29,6 @@ void maxpool2d_initialize(MaxPool2DLayer *layer, int kernel_size, int stride, in
 void maxpool2d_forward(void *self, float *input, size_t input_size, size_t time_step);
 float* maxpool2d_backward(void *self, float *gradients, size_t time_step);
 void maxpool2d_free(MaxPool2DLayer *layer);
+void maxpool2d_zero_grad(void *self);
 
 #endif // MAXPOOL2D_LAYER_H

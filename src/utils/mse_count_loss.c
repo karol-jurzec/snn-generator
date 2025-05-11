@@ -37,7 +37,7 @@ float compute_mse_loss(MSECountLoss* loss) {
     int total_elements = loss->batch_size * loss->num_neurons;
     
     for (int i = 0; i < total_elements; i++) {
-        float diff = (loss->spike_counts[i] - loss->target_counts[i]) / loss->num_steps;
+        float diff = (loss->spike_counts[i] - loss->target_counts[i]);
         total_loss += diff * diff;
     }
     

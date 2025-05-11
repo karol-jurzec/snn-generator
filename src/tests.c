@@ -384,14 +384,14 @@ void train_test() {
 
     // Load the NMNIST dataset
     printf("Loading train dataset from %s...\n", network_config_path_train);
-    NMNISTDataset *dataset_train = load_nmnist_dataset(network_config_path_train, 240, true, 2); // Load up to 160 samples
+    NMNISTDataset *dataset_train = load_nmnist_dataset(network_config_path_train, 1600, true, 10); // Load up to 160 samples
 
     // Train the network
     printf("Training the network...\n");
     train(network, dataset_train);
 
     printf("Loading test dataset from %s...\n", network_config_path_test);
-    NMNISTDataset *dataset_test = load_nmnist_dataset(network_config_path_test, 60, true, 2); // Load up to 160 samples
+    NMNISTDataset *dataset_test = load_nmnist_dataset(network_config_path_test, 400, true, 10); // Load up to 160 samples
 
 
     printf("Testing the network accuracy...\n");

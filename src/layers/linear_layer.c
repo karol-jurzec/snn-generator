@@ -44,58 +44,73 @@ void linear_initialize(LinearLayer *layer, size_t in_features, size_t out_featur
 }
 
 void linear_forward(void *self, float *input, size_t input_size, size_t time_step) {
-    LinearLayer *layer = (LinearLayer *)self;
-    
-    memcpy(layer->base.inputs, input, input_size * sizeof(float));
+    LinearLayer *L = (LinearLayer*)self;
+    // Save the raw input for backward
+    memcpy(L->base.inputs, input, input_size * sizeof(float));
 
-    for (size_t o = 0; o < layer->out_features; o++) {
-        float sum = 0.0f;
-        for (size_t i = 0; i < layer->in_features; i++) {
-            sum += input[i] * layer->base.weights[o * layer->in_features + i];
-        }
-        layer->base.output[o] = sum + layer->biases[o];
+    // y = W * x + b
+    // W: [out_features x in_features], x: [in_features]
+    cblas_sgemv(
+      CblasRowMajor,
+      CblasNoTrans,
+      L->out_features, L->in_features,
+      1.0f,
+      L->base.weights,        // A
+      L->in_features,         // lda
+      input,                  // x
+      1,                      // incx
+      0.0f,
+      L->base.output,         // y
+      1                       // incy
+    );
+
+    // add biases
+    for (size_t o = 0; o < L->out_features; o++) {
+        L->base.output[o] += L->biases[o];
     }
-
-    // Store output for this time step
-    // if (layer->base.output_history) {
-    //     memcpy(&layer->base.output_history[time_step * layer->out_features], 
-    //            layer->base.output, 
-    //            layer->out_features * sizeof(float));
-    // }
 }
 
-
-// Backward pass for Linear Layer
 float* linear_backward(void *self, float *gradients, size_t time_step) {
-    LinearLayer *layer = (LinearLayer *)self;
-    
-    // Load input for this time step
-    float* input = layer->base.inputs;
-    // if (layer->base.output_history) {
-    //     input = &layer->base.output_history[time_step * layer->out_features];
-    // }
+    LinearLayer *L = (LinearLayer*)self;
 
-    // Zero input gradients for this time step
-    // memset(layer->base.input_gradients, 0, layer->in_features * sizeof(float));
+    // 1) Weight gradients: ΔW += dY * x^T
+    // dY: [out_features], x: [in_features]
+    cblas_sger(
+      CblasRowMajor,
+      L->out_features,        // m
+      L->in_features,         // n
+      1.0f,
+      gradients,              // x (m-vector)
+      1,                      // incx
+      L->base.inputs,         // y (n-vector)
+      1,                      // incy
+      L->base.weight_gradients, // A (m x n)
+      L->in_features          // lda
+    );
 
-    for (size_t i = 0; i < layer->out_features; i++) {
-        // Accumulate weight gradients across time
-        for (size_t j = 0; j < layer->in_features; j++) {
-            layer->base.weight_gradients[i * layer->in_features + j] += gradients[i] * input[j];
-        }
-        
-        // Accumulate bias gradients across time
-        layer->base.bias_gradients[i] += gradients[i];
+    // 2) Bias gradients: Δb += dY
+    for (size_t o = 0; o < L->out_features; o++) {
+        L->base.bias_gradients[o] += gradients[o];
     }
 
-    // Compute input gradients (time-step specific)
-    for (size_t j = 0; j < layer->in_features; j++) {
-        for (size_t i = 0; i < layer->out_features; i++) {
-            layer->base.input_gradients[j] += layer->base.weights[i * layer->in_features + j] * gradients[i];
-        }
-    }
+    // 3) Input gradients: dX = W^T * dY
+    // Note: W^T: [in_features x out_features], dY: [out_features]
+    cblas_sgemv(
+      CblasRowMajor,
+      CblasTrans,
+      L->out_features,        // rows of original W
+      L->in_features,         // cols of original W
+      1.0f,
+      L->base.weights,        // A
+      L->in_features,         // lda
+      gradients,              // x
+      1,                      // incx
+      0.0f,
+      L->base.input_gradients,// y
+      1                       // incy
+    );
 
-    return layer->base.input_gradients;
+    return L->base.input_gradients;
 }
 
 // Update weights for Linear Layer

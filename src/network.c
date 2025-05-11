@@ -11,7 +11,7 @@
 #include "../include/layers/spiking_layer.h"
 #include "../include/utils/mse_count_loss.h"
 
-#define LEARNING_RATE 0.01
+#define LEARNING_RATE 0.001
 //#define EPOCHS 10
 #define BATCH_SIZE 8
 #define TIME_BINS 4
@@ -213,7 +213,7 @@ void initialize_network_with_bptt(Network *network, int time_steps) {
 void train(Network *network, NMNISTDataset *dataset) {
     printf("Starting training...\n");
 
-    int epochs = 20;
+    int epochs = 50;
     MSECountLoss mse_loss;
     init_mse_count_loss(&mse_loss, BATCH_SIZE, 10, TIME_BINS, 0.8f, 0.2f);
 
@@ -315,7 +315,7 @@ void train(Network *network, NMNISTDataset *dataset) {
             }
 
             for (size_t k = 0; k < 10; k++) {
-                avg_gradients[k] /= (actual_batch_size  * TIME_BINS );
+                avg_gradients[k] /=  (actual_batch_size);
             }
 
             float* current_gradients = avg_gradients;
@@ -332,17 +332,18 @@ void train(Network *network, NMNISTDataset *dataset) {
             //free(avg_gradients);
 
             #ifdef ENABLE_DEBUG_LOG
-                //log_gradients(network, epoch + 1, epoch * dataset->num_samples + batch_start);
+               // log_gradients(network, epoch + 1, epoch * dataset->num_samples + batch_start);
                 //log_weights(network, epoch + 1, epoch * dataset->num_samples + batch_start);
             #endif
         }
 
-        float avg_loss = epoch_loss;
+        float avg_loss = epoch_loss / total_samples;
         float accuracy = 100.0f * ((float)correct_predictions / total_samples);
         printf("Epoch %d/%d, Loss: %.4f, Accuracy: %.2f%%\n",
                epoch + 1, epochs, avg_loss, accuracy);
     }
 
+    
     free_mse_count_loss(&mse_loss);
     free(batch_labels);
     free(batch_gradients);

@@ -14,7 +14,8 @@
         "xutility": "c",
         "mse_count_loss.h": "c",
         "network_logger.h": "c",
-        "stdio.h": "c"
+        "stdio.h": "c",
+        "layer_utils.h": "c"
     },
 "C_Cpp.errorSquiggles": "disabled"
 }

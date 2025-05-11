@@ -9,12 +9,14 @@ void spiking_initialize(SpikingLayer *layer, size_t num_neurons, ModelBase **neu
     layer->base.is_spiking = true;
     layer->base.forward = spiking_forward;
     layer->base.backward = spiking_backward;
+    layer->base.zero_grad = spiking_zero_grad;  // Assign function pointer
     layer->base.reset_spike_counts = spiking_reset_spike_counts;
     layer->base.num_inputs= num_neurons;
     layer->num_neurons = num_neurons;
     layer->neurons = (ModelBase **)malloc(num_neurons * sizeof(ModelBase *));
     layer->base.inputs = (float *)malloc(num_neurons * sizeof(float));
     layer->base.output = (float *)malloc(num_neurons * sizeof(float));
+
     layer->base.output_size = num_neurons;
 
     for (size_t i = 0; i < num_neurons; i++) {
@@ -69,6 +71,29 @@ float* spiking_backward(void *self, float *gradients, size_t time_step) {
     }
 
     return layer->base.input_gradients;
+}
+
+void spiking_zero_grad(void *self) {
+    SpikingLayer *layer = (SpikingLayer *)self;
+    
+    // Zero out spike gradients
+    if (layer->spike_gradients) {
+        memset(layer->spike_gradients, 0, layer->num_neurons * sizeof(float));
+    }
+    
+    // Zero out input gradients
+    if (layer->base.input_gradients) {
+        memset(layer->base.input_gradients, 0, layer->num_neurons * sizeof(float));
+    }
+    
+    // If you later add weight/bias gradients to SpikingLayer:
+    // if (layer->base.weight_gradients) {
+    //     memset(layer->base.weight_gradients, 0, 
+    //            layer->base.num_inputs * layer->base.num_outputs * sizeof(float));
+    // }
+    // if (layer->base.bias_gradients) {
+    //     memset(layer->base.bias_gradients, 0, layer->base.num_outputs * sizeof(float));
+    // }
 }
 
 void spiking_reset_spike_counts(void *self) {
