@@ -13,6 +13,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+static int current_channels = -1;   // Input channels (e.g., for NMNIST or STMNIST: 2 polarity channels)
+static int current_height = -1;     // Input height
+static int current_width = -1;      // Input width
+
 ModelBase **initialize_neurons(const char *neuron_type, size_t num_neurons, struct json_object *neuron_config) {
     ModelBase **neurons = (ModelBase **)malloc(num_neurons * sizeof(ModelBase *));
     
@@ -20,7 +24,7 @@ ModelBase **initialize_neurons(const char *neuron_type, size_t num_neurons, stru
         float beta = json_object_get_double(json_object_object_get(neuron_config, "beta"));
         for (size_t i = 0; i < num_neurons; i++) {
             neurons[i] = (ModelBase *)malloc(sizeof(LIFNeuron));
-            lif_initialize((LIFNeuron *)neurons[i], 0.0f, 1.0f, 0.0f, beta);
+            lif_initialize((LIFNeuron *)neurons[i], 0.0f,1.0f, 0.0f, 0.5f);
         }
     }
     // rest neuron types etc... 
@@ -28,11 +32,10 @@ ModelBase **initialize_neurons(const char *neuron_type, size_t num_neurons, stru
     return neurons;
 }
 
-void parse_and_add_layer(Network *network, struct json_object *layer_config, size_t index) {
-    static int current_channels = 2;   // Input channels (e.g., for NMNIST: 2 polarity channels)
-    static int current_height = 34;   // Input height
-    static int current_width = 34;    // Input width
+//(10, 10, 2)
 
+void parse_and_add_layer(Network *network, struct json_object *layer_config, size_t index) {
+    
     const char *type = json_object_get_string(json_object_object_get(layer_config, "type"));
 
     if (strcmp(type, "Conv2d") == 0) {
@@ -107,8 +110,7 @@ void parse_and_add_layer(Network *network, struct json_object *layer_config, siz
     }
 }
 
-
-Network *initialize_network_from_file(const char *config_path) {
+Network *initialize_network_from_file(const char *config_path, int input_heigth, int input_width, int input_channels) {
     FILE *fp = fopen(config_path, "r");
     if (!fp) {
         printf("Error opening config file.\n");
@@ -126,6 +128,10 @@ Network *initialize_network_from_file(const char *config_path) {
 
     Network *network = create_network(num_layers);
 
+    current_height = input_heigth;
+    current_width = input_width;
+    current_channels = input_channels;
+
     for (size_t i = 0; i < num_layers; i++) {
         struct json_object *layer_config = json_object_array_get_idx(layers, i);
         parse_and_add_layer(network, layer_config, i);
@@ -133,4 +139,87 @@ Network *initialize_network_from_file(const char *config_path) {
 
     json_object_put(parsed_json); // Free JSON memory
     return network;
+}
+
+void load_weights_from_json(Network *network, const char *weights_path) {
+    FILE *fp = fopen(weights_path, "r");
+    if (!fp) {
+        printf("Error opening weights file.\n");
+        return;
+    }
+
+    char buffer[524288];  // Ensure this is big enough for your JSON
+    
+    fread(buffer, 1, sizeof(buffer), fp);
+    fclose(fp);
+
+    struct json_object *parsed_json = json_tokener_parse(buffer);
+    struct json_object_iterator it = json_object_iter_begin(parsed_json);
+    struct json_object_iterator end = json_object_iter_end(parsed_json);
+
+    while (!json_object_iter_equal(&it, &end)) {
+        const char *key = json_object_iter_peek_name(&it);
+        struct json_object *val = json_object_iter_peek_value(&it);
+
+        // Parse layer index and param type from key, e.g., "0.weight"
+        char layer_idx_str[10], param_type[10];
+        sscanf(key, "%[^.].%s", layer_idx_str, param_type);
+        int layer_index = atoi(layer_idx_str);
+
+        // Access the correct layer in the network
+        LayerBase *layer = network->layers[layer_index];
+
+        if (strcmp(param_type, "weight") == 0) {
+            if (layer->layer_type == LAYER_CONV2D) {
+                Conv2DLayer *conv = (Conv2DLayer *)layer;
+                int out_c = conv->out_channels;
+                int in_c = conv->in_channels;
+                int k = conv->kernel_size;
+                for (int i = 0; i < out_c; i++) {
+                    for (int j = 0; j < in_c; j++) {
+                        for (int x = 0; x < k; x++) {
+                            for (int y = 0; y < k; y++) {
+                                struct json_object *jlist = json_object_array_get_idx(val, i);       // i: out_channel
+                                struct json_object *klist = json_object_array_get_idx(jlist, j);     // j: in_channel
+                                struct json_object *row = json_object_array_get_idx(klist, x);       // x: kernel row
+                                struct json_object *elem = json_object_array_get_idx(row, y);        // y: kernel col
+                                double val_f = json_object_get_double(elem);
+
+                                int idx = ((i * in_c + j) * k + x) * k + y;
+                                layer->weights[idx] = (float)val_f;
+                            }
+                        }
+                    }
+                }
+            } else if (layer->layer_type == LAYER_LINEAR) {
+                LinearLayer *lin = (LinearLayer *)layer;
+                for (int i = 0; i < lin->out_features; i++) {
+                    struct json_object *row = json_object_array_get_idx(val, i);
+                    for (int j = 0; j < lin->in_features; j++) {
+                        double val_f = json_object_get_double(json_object_array_get_idx(row, j));
+                        int idx = i * lin->in_features + j;
+                        layer->weights[idx] = (float)val_f;
+                    }
+                }
+            }
+        } else if (strcmp(param_type, "bias") == 0) {
+            if (layer->layer_type == LAYER_CONV2D) {
+                Conv2DLayer *conv = (Conv2DLayer *)layer;
+                for (int i = 0; i < conv->out_channels; i++) {
+                    double val_f = json_object_get_double(json_object_array_get_idx(val, i));
+                    conv->biases[i] = (float)val_f;
+                }
+            } else if (layer->layer_type == LAYER_LINEAR) {
+                LinearLayer *lin = (LinearLayer *)layer;
+                for (int i = 0; i < lin->out_features; i++) {
+                    double val_f = json_object_get_double(json_object_array_get_idx(val, i));
+                    lin->biases[i] = (float)val_f;
+                }
+            }
+        }
+
+        json_object_iter_next(&it);
+    }
+
+    json_object_put(parsed_json);
 }

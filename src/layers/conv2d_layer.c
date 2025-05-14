@@ -56,7 +56,6 @@ void conv2d_forward(void *self, float *input, size_t input_size, size_t time_ste
     int kernel_dim = layer->in_channels * layer->kernel_size * layer->kernel_size;
     int num_outputs = output_dim * output_dim;
 
-    // Save input
     memcpy(layer->base.inputs, input, input_size * sizeof(float));
 
     // im2col: convert input into column matrix

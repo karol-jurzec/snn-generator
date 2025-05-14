@@ -6,6 +6,8 @@
 #include <stdint.h>
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
+#define FILTER_TIME 10000  // 10 ms
+
 
 #include "../../include/utils/stb_image_write.h"
 #include "../../include/utils/nmnist_loader.h"
@@ -36,23 +38,217 @@ static void stabilize_events(NMNISTEvent *events, size_t num_events) {
     }
 }
 
-// Helper function to load a single NMNIST file
-NMNISTSample load_nmnist_sample(const char *file_path, int label, bool stabilize) {
+size_t denoise_events(NMNISTEvent *events, size_t num_events) {
+    NMNISTEvent *filtered = (NMNISTEvent *)malloc(num_events * sizeof(NMNISTEvent));
+    if (!filtered) {
+        fprintf(stderr, "Error: Memory allocation failed in denoise_events\n");
+        return 0;
+    }
+
+    size_t filtered_count = 0;
+
+    for (size_t i = 0; i < num_events; i++) {
+        bool has_neighbor = false;
+
+        // Check backward neighbor
+        if (i > 0 && (events[i].timestamp - events[i - 1].timestamp <= FILTER_TIME)) {
+            has_neighbor = true;
+        }
+
+        // Check forward neighbor
+        if (i < num_events - 1 && (events[i + 1].timestamp - events[i].timestamp <= FILTER_TIME)) {
+            has_neighbor = true;
+        }
+
+        if (has_neighbor) {
+            filtered[filtered_count++] = events[i];
+        }
+    }
+
+    // Copy filtered events back
+    memcpy(events, filtered, filtered_count * sizeof(NMNISTEvent));
+    free(filtered);
+
+    return filtered_count;
+}
+
+typedef enum {
+    FRAME_BY_TIME_WINDOW,
+    FRAME_BY_EVENT_COUNT,
+    FRAME_BY_N_TIME_BINS
+} FrameSlicingMode;
+
+// Frame allocation helper
+int16_t ****allocate_frames(int num_bins, int height, int width) {
+    int16_t ****frames = malloc(num_bins * sizeof(int16_t ***));
+    for (int b = 0; b < num_bins; b++) {
+        frames[b] = malloc(2 * sizeof(int16_t **));
+        for (int p = 0; p < 2; p++) {
+            frames[b][p] = malloc(height * sizeof(int16_t *));
+            for (int y = 0; y < height; y++) {
+                frames[b][p][y] = calloc(width, sizeof(int16_t));
+            }
+        }
+    }
+    return frames;
+}
+
+// Frame deallocation helper
+void free_frames(int16_t ****frames, int num_bins, int height) {
+    for (int b = 0; b < num_bins; b++) {
+        for (int p = 0; p < 2; p++) {
+            for (int y = 0; y < height; y++) {
+                free(frames[b][p][y]);
+            }
+            free(frames[b][p]);
+        }
+        free(frames[b]);
+    }
+    free(frames);
+}
+
+int16_t ****to_frame(
+    NMNISTEvent *events,
+    size_t num_events,
+    int width,
+    int height,
+    int mode,
+    int mode_param,
+    float overlap,
+    int *out_num_bins 
+) {
+    if (num_events == 0 || mode_param <= 0) return NULL;
+
+    uint32_t t_start = events[0].timestamp;
+    uint32_t t_end = events[num_events - 1].timestamp;
+    uint32_t duration = t_end - t_start;
+    if (duration == 0) duration = 1;
+
+    int num_bins = 0;
+    size_t *event_start_indices = NULL;
+
+    switch (mode) {
+        case FRAME_BY_N_TIME_BINS: {
+            num_bins = mode_param;
+            break;
+        }
+        case FRAME_BY_TIME_WINDOW: {
+            uint32_t window = (uint32_t)mode_param;
+            uint32_t stride = (uint32_t)(window * (1.0f - overlap));
+            if (stride == 0) stride = 1;
+
+            for (uint32_t t = t_start; t + window <= t_end; t += stride)
+                num_bins++;
+            break;
+        }
+        case FRAME_BY_EVENT_COUNT: {
+            size_t stride = (size_t)(mode_param * (1.0f - overlap));
+            if (stride == 0) stride = 1;
+            num_bins = (num_events - mode_param) / stride + 1;
+            break;
+        }
+        default:
+            return NULL;
+    }
+
+    if (num_bins <= 0) return NULL;
+    if (out_num_bins) *out_num_bins = num_bins;
+
+    int16_t ****frames = allocate_frames(num_bins, height, width);
+
+    // Process events per mode
+    switch (mode) {
+        case FRAME_BY_N_TIME_BINS: {
+            for (size_t i = 0; i < num_events; i++) {
+                NMNISTEvent e = events[i];
+                int bin = (int)(((e.timestamp - t_start) * num_bins) / (float)duration);
+                if (bin >= num_bins) bin = num_bins - 1;
+                if (e.polarity > 1 || e.x >= width || e.y >= height) continue;
+                frames[bin][e.polarity][e.y][e.x] += 1;
+            }
+            break;
+        }
+
+        case FRAME_BY_TIME_WINDOW: {
+            uint32_t window = (uint32_t)mode_param;
+            uint32_t stride = (uint32_t)(window * (1.0f - overlap));
+            if (stride == 0) stride = 1;
+
+            size_t idx = 0;
+            for (int bin = 0; bin < num_bins; bin++) {
+                uint32_t bin_start = t_start + bin * stride;
+                uint32_t bin_end = bin_start + window;
+
+                while (idx < num_events && events[idx].timestamp < bin_start) idx++;
+
+                for (size_t j = idx; j < num_events && events[j].timestamp < bin_end; j++) {
+                    NMNISTEvent e = events[j];
+                    if (e.polarity > 1 || e.x >= width || e.y >= height) continue;
+                    frames[bin][e.polarity][e.y][e.x] += 1;
+                }
+            }
+            break;
+        }
+
+        case FRAME_BY_EVENT_COUNT: {
+            size_t stride = (size_t)(mode_param * (1.0f - overlap));
+            if (stride == 0) stride = 1;
+
+            for (int bin = 0; bin < num_bins; bin++) {
+                size_t start = bin * stride;
+                size_t end = start + mode_param;
+                if (end > num_events) end = num_events;
+
+                for (size_t j = start; j < end; j++) {
+                    NMNISTEvent e = events[j];
+                    if (e.polarity > 1 || e.x >= width || e.y >= height) continue;
+                    frames[bin][e.polarity][e.y][e.x] += 1;
+                }
+            }
+            break;
+        }
+    }
+
+    return frames;
+}
+
+float *flatten_frames_to_float(int16_t ****frames, int bins, int height, int width) {
+    int channels = 2;
+    size_t size = (size_t)bins * channels * height * width;
+    float *output = (float *)calloc(size, sizeof(float));
+    if (!output) {
+        fprintf(stderr, "Error: Memory allocation failed in flatten_frames_to_float\n");
+        return NULL;
+    }
+
+    for (int b = 0; b < bins; b++) {
+        for (int c = 0; c < channels; c++) {
+            for (int y = 0; y < height; y++) {
+                for (int x = 0; x < width; x++) {
+                    size_t idx = ((size_t)c * bins * height * width) +
+                                 ((size_t)b * height * width) +
+                                 ((size_t)y * width) + x;
+                    output[idx] = (float)frames[b][c][y][x];
+                }
+            }
+        }
+    }
+
+    return output;
+}
+
+NMNISTSample load_nmnist_sample(const char *file_path, int label, bool stabilize, bool denoise) {
     FILE *file = fopen(file_path, "rb");
     if (!file) {
         printf("Error: Could not open file %s\n", file_path);
         exit(EXIT_FAILURE);
     }
 
-  //  int x = -1;
-  //  int y = -1;
-
-    // Determine the number of events
     fseek(file, 0, SEEK_END);
     size_t file_size = ftell(file);
     fseek(file, 0, SEEK_SET);
 
-    size_t num_events = file_size / 5;  // Each event is 5 bytes
+    size_t num_events = file_size / 5;
     NMNISTEvent *events = (NMNISTEvent *)malloc(num_events * sizeof(NMNISTEvent));
     if (!events) {
         printf("Error: Memory allocation for NMNIST events failed\n");
@@ -60,48 +256,51 @@ NMNISTSample load_nmnist_sample(const char *file_path, int label, bool stabilize
         exit(EXIT_FAILURE);
     }
 
-    // Read and decode events
     for (size_t i = 0; i < num_events; i++) {
         unsigned char buffer[5];
         fread(buffer, 1, 5, file);
 
-        events[i].x = buffer[0];  // X-address
-        events[i].y = buffer[1];  // Y-address
-        events[i].polarity = (buffer[2] >> 7) & 1;  // Polarity (MSB)
-        events[i].timestamp = ((buffer[2] & 0x7F) << 16) | (buffer[3] << 8) | buffer[4];  // Timestamp
-
-
-        //if(x < events[i].x) {
-        //    x = events[i].x;
-        //}
-
-        //if(y < events[i].y) {
-        //    y = events[i].y;
-        //}
+        events[i].x = buffer[0];
+        events[i].y = buffer[1];
+        events[i].polarity = (buffer[2] >> 7) & 1;
+        events[i].timestamp = ((buffer[2] & 0x7F) << 16) | (buffer[3] << 8) | buffer[4];
     }
-
-
-//    printf("Max x coord for that sample %d\n", x);
-//    printf("Max y coord for that sample %d\n\n", y);
-
 
     fclose(file);
 
-    // Stabilize events if required
     if (stabilize) {
         stabilize_events(events, num_events);
     }
 
-    // Construct the sample
+    if (denoise) {
+        num_events = denoise_events(events, num_events);
+    }
+
     NMNISTSample sample;
     sample.num_events = num_events;
     sample.events = events;
     sample.label = label;
 
+    // Generate 4D frame representation
+    int num_bins;
+    sample.frames = to_frame(
+        events,
+        num_events,
+        34, 34,                      // Width x Height for NMNIST
+        FRAME_BY_N_TIME_BINS,        // Or whatever slicing mode you prefer
+        300,                           // e.g. 10 bins
+        0.0f,                        // No overlap
+        &num_bins
+    );
+    sample.num_bins = num_bins;
+
+    // Flatten to float* input for the neural network
+    sample.input = flatten_frames_to_float(sample.frames, num_bins, 34, 34);
+
     return sample;
 }
 
-NMNISTDataset *load_nmnist_dataset(const char *data_dir, size_t max_samples, bool stabilize, int num_classes) {
+NMNISTDataset *load_nmnist_dataset(const char *data_dir, size_t max_samples, bool stabilize, bool denoise, int num_classes) {
     if (num_classes < 1 || num_classes > 10) {
         printf("Error: num_classes must be between 1 and 10\n");
         return NULL;
@@ -165,7 +364,7 @@ NMNISTDataset *load_nmnist_dataset(const char *data_dir, size_t max_samples, boo
         // Load up to max_per_class from this class
         size_t samples_loaded = 0;
         for (size_t i = 0; i < class_count && samples_loaded < max_per_class; i++) {
-            NMNISTSample sample = load_nmnist_sample(class_paths[i].path, class_paths[i].label, stabilize);
+            NMNISTSample sample = load_nmnist_sample(class_paths[i].path, class_paths[i].label, stabilize, denoise);
             dataset->samples[dataset->num_samples++] = sample;
             samples_loaded++;
         }
@@ -182,6 +381,33 @@ NMNISTDataset *load_nmnist_dataset(const char *data_dir, size_t max_samples, boo
     }
 
     return dataset;
+}
+
+float *load_flat_spike_input(const char *filename, size_t total_size) {
+    FILE *file = fopen(filename, "r");
+    if (!file) {
+        perror("Failed to open spike input file");
+        return NULL;
+    }
+
+    float *input = (float *)malloc(total_size * sizeof(float));
+    if (!input) {
+        perror("Failed to allocate memory for input");
+        fclose(file);
+        return NULL;
+    }
+
+    for (size_t i = 0; i < total_size; ++i) {
+        if (fscanf(file, "%f", &input[i]) != 1) {
+            fprintf(stderr, "Error reading float at index %zu\n", i);
+            free(input);
+            fclose(file);
+            return NULL;
+        }
+    }
+
+    fclose(file);
+    return input;
 }
 
 
@@ -364,10 +590,10 @@ void print_frame(float *data, int height, int width) {
 }
 
 // Generate and save temporal frames for a sample
-void visualize_sample_frames(const NMNISTSample *sample, const char *output_dir, int time_bins, int height, int width, unsigned int max_time) {
+void visualize_sample_frames(float *discretized_input, const char *output_dir, int time_bins, int height, int width, unsigned int max_time) {
     // Convert events to discretized input
-    float *discretized_input = convert_events_to_input(
-        sample->events, sample->num_events, time_bins, height, width, max_time);
+    //float *discretized_input = convert_events_to_input(
+    //    sample->events, sample->num_events, time_bins, height, width, max_time);
 
     // Create output directory if it doesn't exist
     char mkdir_command[256];

@@ -15,7 +15,14 @@
         "mse_count_loss.h": "c",
         "network_logger.h": "c",
         "stdio.h": "c",
-        "layer_utils.h": "c"
+        "layer_utils.h": "c",
+        "string.h": "c",
+        "types.h": "c",
+        "stdlib.h": "c",
+        "algorithm": "c",
+        "initializer_list": "c",
+        "utility": "c",
+        "stdint.h": "c"
     },
 "C_Cpp.errorSquiggles": "disabled"
 }

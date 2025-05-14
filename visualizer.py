@@ -61,4 +61,8 @@ def visualize_spikes(sample, epoch):
             print(f"Processing {layer_path}")
             plot_spike_raster(layer_path, layer_num, sample, epoch)
 
-visualize_spikes(sample=31, epoch=1)
+visualize_spikes(sample=0, epoch=0)
+visualize_spikes(sample=100, epoch=0)
+visualize_spikes(sample=200, epoch=0)
+visualize_spikes(sample=300, epoch=0)
+

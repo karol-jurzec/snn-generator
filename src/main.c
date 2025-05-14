@@ -66,12 +66,14 @@ int main(int argc, char *argv[]) {
 
     double t0 = now_seconds();
 
-    train_test();
+    //train_test();
+    //loader_test();
+    stmnist_test();
 
     double t1 = now_seconds();
     printf("train_test() took %.6f seconds\n", t1 - t0);
 
-    //discretization_test();
+    
     //iris_classification_example();
     //hor_vert_dataset();
 

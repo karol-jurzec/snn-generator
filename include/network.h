@@ -25,6 +25,7 @@ void train(Network *network, NMNISTDataset *dataset);
 float test(Network *network, NMNISTDataset *dataset);
 void zero_grads(Network* model);
 void compute_probabilities(float *spike_counts, size_t num_neurons, float *probabilities);
+void sample_test(Network *network);
 
 
 

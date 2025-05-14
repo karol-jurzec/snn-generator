@@ -100,7 +100,9 @@ void spiking_reset_spike_counts(void *self) {
     SpikingLayer *layer = (SpikingLayer *)self;
     for (size_t i = 0; i < layer->num_neurons; i++) {
         LIFNeuron *neuron = (LIFNeuron *)layer->neurons[i];
+        neuron->base.v = 0;     // or 0 if v_rest is 0
         neuron->spike_count = 0;
+        neuron->base.spiked = 0;
     }
 }
 

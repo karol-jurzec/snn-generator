@@ -1,0 +1,62 @@
+{ 
+    "layers" : [
+        {
+            "type": "Conv2d",
+            "in_channels": 2,
+            "out_channels": 12,
+            "kernel_size": [
+                5,
+                5
+            ]
+        },
+        {
+            "type": "MaxPool2d",
+            "kernel_size": 2
+        },
+        {
+            "type": "SpikingLayer",
+            "beta": 0.5,
+            "spike_grad": "atan",
+            "neuron_type": "Leaky",
+            "init_hidden": true,
+            "output": false
+        },
+        {
+            "type": "Conv2d",
+            "in_channels": 12,
+            "out_channels": 32,
+            "kernel_size": [
+                5,
+                5
+            ]
+        },
+        {
+            "type": "MaxPool2d",
+            "kernel_size": 2
+        },
+        {
+            "type": "SpikingLayer",
+            "beta": 0.5,
+            "spike_grad": "atan",
+            "neuron_type": "Leaky",
+            "init_hidden": true,
+            "output": false
+        },
+        {
+            "type": "Flatten"
+        },
+        {
+            "type": "Linear",
+            "in_features": 800,
+            "out_features": 10
+        },
+        {
+            "type": "SpikingLayer",
+            "beta": 0.5,
+            "neuron_type":"Leaky",
+            "spike_grad": "atan",
+            "init_hidden": true,
+            "output": true
+        }
+    ]
+}

@@ -44,25 +44,95 @@ void log_gradients(Network *network, int epoch, int sample) {
     fclose(file);
 }
 
+const char* get_layer_type_name(LayerType type) {
+    switch (type) {
+        case LAYER_CONV2D: return "Conv2D";
+        case LAYER_LINEAR: return "Linear";
+        case LAYER_MAXPOOL2D: return "MaxPool2D";
+        case LAYER_FLATTEN: return "Flatten";
+        case LAYER_SPIKING: return "Spiking";
+        default: return "Unknown";
+    }
+}
+
 void log_inputs(Network *network, int epoch, int sample, int t) {
-    char filename[50];
-    snprintf(filename, sizeof(filename), "out/inputs/inputs_epoch_%d_sample_%d_t_%d.txt", epoch, sample, t);
+    const char *base_dir = "out/inputs";
 
-    FILE *file = fopen(filename, "w");
-    if (!file) return;
-
-    fprintf(file, "Epoch %d, Sample %d, Time %d\n", epoch, sample, t);
     for (size_t l = 0; l < network->num_layers; l++) {
         LayerBase *layer = network->layers[l];
+
         if (layer->inputs && layer->num_inputs > 0) {
-            fprintf(file, "Layer %zu\n", l);
+            const char *type_str = get_layer_type_name(layer->layer_type);
+
+            // Construct subdirectory path: e.g., out/inputs/Conv2D_0/
+            char dir_path[256];
+            snprintf(dir_path, sizeof(dir_path), "%s/%s_%zu", base_dir, type_str, l);
+
+            // Create directory if it doesn't exist
+            create_directory(base_dir);
+            create_directory(dir_path);
+
+            // Build full file path
+            char filepath[300];
+            snprintf(filepath, sizeof(filepath), "%s/inputs_epoch_%d_sample_%d_t_%d.txt", dir_path, epoch, sample, t);
+
+            FILE *file = fopen(filepath, "w");
+            if (!file) {
+                perror("Failed to open input log file");
+                continue;
+            }
+
+            fprintf(file, "Epoch %d, Sample %d, Time %d\n", epoch, sample, t);
+            fprintf(file, "Layer %zu (%s)\n", l, type_str);
             for (size_t i = 0; i < layer->num_inputs; i++) {
                 fprintf(file, "%f\n", layer->inputs[i]);
             }
+            fclose(file);
         }
     }
-    fclose(file);
 }
+
+void log_outputs(Network *network, int epoch, int sample, int t) {
+    const char *base_output_dir = "out/outputs";
+    create_directory(base_output_dir);  // Ensure base directory exists
+
+    for (size_t l = 0; l < network->num_layers; l++) {
+        LayerBase *layer = network->layers[l];
+
+        if (!layer || !layer->output || layer->output_size == 0) {
+            continue;
+        }
+
+        const char *type_str = get_layer_type_name(layer->layer_type);
+
+        // Use layer->type directly as folder name
+        char layer_type_dir[100];
+        snprintf(layer_type_dir, sizeof(layer_type_dir), "%s/%s_%zu", base_output_dir, type_str, l);
+        create_directory(layer_type_dir);
+
+        // Compose output file path
+        char filename[150];
+        snprintf(filename, sizeof(filename),
+                 "%s/%s_epoch_%d_sample_%d_t_%d.txt",
+                 layer_type_dir, type_str, epoch, sample, t);
+
+        FILE *file = fopen(filename, "w");
+        if (!file) {
+            perror("Failed to open output file");
+            continue;
+        }
+
+        fprintf(file, "Epoch %d, Sample %d, Time %d\n", epoch, sample, t);
+        fprintf(file, "Layer %zu (%s)\n", l, type_str);
+
+        for (size_t i = 0; i < layer->output_size; i++) {
+            fprintf(file, "%f\n", layer->output[i]);
+        }
+
+        fclose(file);
+    }
+}
+
 
 
 // 3 spiking layers 

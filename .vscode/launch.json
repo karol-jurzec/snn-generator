@@ -12,7 +12,7 @@
             "environment": [
                 {
                     "name": "PATH",
-                    "value": "C:/msys64/ucrt64/bin;C:/msys64/usr/bin;${env:PATH}"
+                    "value": "C:/msys64/ucrt64/bin;C:/msys64/usr/bin;C:/msys64/mingw64/bin;${env:PATH}"
                 }
             ],
             "externalConsole": true,

@@ -13,8 +13,8 @@
 
 #define LEARNING_RATE 0.001
 //#define EPOCHS 10
-#define BATCH_SIZE 8
-#define TIME_BINS 4
+#define BATCH_SIZE 1
+#define TIME_BINS 300
 #define NUM_CLASSES 10
 
 #define ENABLE_DEBUG_LOG
@@ -237,10 +237,10 @@ void train(Network *network, NMNISTDataset *dataset) {
                 NMNISTSample *sample = &dataset->samples[sample_idx];
 
                 int max_time = sample->events[sample->num_events - 1].timestamp;
-                float *input = convert_events_to_input(sample->events, sample->num_events,
-                                                       TIME_BINS, 34, 34, max_time);
-
+                
                 size_t input_size_per_bin = 2 * 34 * 34;
+                float *input = (float *)malloc(input_size_per_bin * sizeof(float));
+                memcpy(input, sample->input, input_size_per_bin * sizeof(float));
 
                 for (size_t l = 0; l < network->num_layers; l++) {
                     if (network->layers[l]->is_spiking) {
@@ -351,6 +351,46 @@ void train(Network *network, NMNISTDataset *dataset) {
     printf("Training complete!\n");
 }
 
+void sample_test(Network *network) {
+    size_t input_size = 2 * 306 * 34 * 34;
+    float *input = load_flat_spike_input("converted_input.txt", input_size);
+
+    if (!input) {
+        fprintf(stderr, "Input loading failed.\n");
+        return;
+    }
+
+    // Now run through the network, one frame at a time:
+    size_t frame_size = 2 * 34 * 34;
+
+    for (int t = 0; t < 306; ++t) {
+        float *frame = &input[t * frame_size];
+        network->layers[0]->forward(network->layers[0], frame, frame_size, 0);
+        for (size_t l = 1; l < network->num_layers; l++) {
+            network->layers[l]->forward(
+                network->layers[l], 
+                network->layers[l - 1]->output, 
+                network->layers[l - 1]->output_size, 0);
+        }
+
+        //log_spikes(network, 0, 0, t, 0);
+        log_outputs(network, 0, 0, t);
+        log_inputs(network, 0, 0, t);
+
+        
+    }
+
+    SpikingLayer *output_layer = (SpikingLayer *)network->layers[network->num_layers - 1];
+    float spike_counts[output_layer->num_neurons];
+    for (size_t n = 0; n < output_layer->num_neurons; n++) {
+        LIFNeuron *neuron = (LIFNeuron *)output_layer->neurons[n];
+        spike_counts[n] = (float)neuron->spike_count;
+        
+    }
+
+    printf("TESTING HAS BEEN FINISHED\n");
+}
+
 float test(Network *network, NMNISTDataset *dataset) {
     size_t correct_predictions = 0;
     size_t total_samples = dataset->num_samples;
@@ -377,6 +417,9 @@ float test(Network *network, NMNISTDataset *dataset) {
                 network->layers[j]->forward(network->layers[j], network->layers[j - 1]->output,
                                             network->layers[j - 1]->output_size, 0);
             }
+            if(i % 100 == 0) {
+                log_spikes(network, 0, i, t, sample->label);
+            }
         }
 
         SpikingLayer *output_layer = (SpikingLayer *)network->layers[network->num_layers - 1];
@@ -384,6 +427,7 @@ float test(Network *network, NMNISTDataset *dataset) {
         for (size_t n = 0; n < output_layer->num_neurons; n++) {
             LIFNeuron *neuron = (LIFNeuron *)output_layer->neurons[n];
             spike_counts[n] = (float)neuron->spike_count;
+            
         }
 
         float probabilities[output_layer->num_neurons];
@@ -404,6 +448,8 @@ float test(Network *network, NMNISTDataset *dataset) {
 
         free(input);
     }
+
+    log_weights(network, 0, 0);
 
     float accuracy = (float)correct_predictions / total_samples * 100.0f;
     printf("Validation Accuracy: %.2f%%\n", accuracy);

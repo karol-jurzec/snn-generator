@@ -15,6 +15,7 @@
 #include "../include/utils/network_loader.h"
 #include "../include/utils/network_logger.h"
 #include "../include/utils/nmnist_loader.h"
+#include "../include/utils/dataset_loader.h"
 
 #include "../include/layers/conv2d_layer.h"
 #include "../include/layers/maxpool2d_layer.h"
@@ -298,6 +299,14 @@ void print_sample(const NMNISTSample *sample, size_t max_events_to_display) {
     }
 }
 
+void loader_test() {
+    const char *dataset_dir = "C:/Users/karol/Desktop/karol/agh/praca_snn/dataset/dvsgesture/DvsGesture";  
+    size_t max_samples_to_load = 100;
+
+    Dataset *ds = load_dataset(dataset_dir, FORMAT_DVSGESTURE, 20, false);
+    printf("Loaded %zu samples\n", ds->num_samples);
+}
+
 void nmnist_loader_test() {
     // Directory containing the NMNIST dataset
     // const char *dataset_dir = "/Users/karol/Desktop/karol/agh/praca-snn/N-MNIST/Train";   
@@ -308,14 +317,15 @@ void nmnist_loader_test() {
     size_t max_samples_to_load = 10000;
 
     // Enable stabilization (true) or disable it (false)
-    bool stabilize = true;
+    bool stabilize = false;
+    bool denoise = true;
 
     printf("Loading NMNIST dataset with stabilization=%s...\n",
            stabilize ? "ENABLED" : "DISABLED");
 
     // Load the NMNIST dataset
     NMNISTDataset *dataset =
-        load_nmnist_dataset(dataset_dir, max_samples_to_load, stabilize, 10);
+        load_nmnist_dataset(dataset_dir, max_samples_to_load, stabilize, denoise, 10);
 
     if (!dataset) {
         printf("Error: Failed to load NMNIST dataset.\n");
@@ -347,7 +357,7 @@ void discretization_test() {
 
     NMNISTSample sample = load_nmnist_sample(
     "/Users/karol/Desktop/karol/agh/praca-snn/N-MNIST/Train/5/00333.bin",
-    4, false);
+    4, false, true);
 
     int max_time = sample.events[sample.num_events - 1].timestamp;
 
@@ -368,30 +378,52 @@ void discretization_test() {
     */
 }
 
+void stmnist_test() {
+    const char *model_architecrure = "scnn_stmnist_architecture.json";
+    const char *model_weights = "scnn_stmnist_weights.json";
 
-void train_test() {
-    const char *network_config_path_train = "C:/Users/karol/Desktop/karol/agh/praca_snn/data/NMNIST/Train";   
-    const char *network_config_path_test = "C:/Users/karol/Desktop/karol/agh/praca_snn/data/NMNIST/Test"; 
-    const char *dataset_path = "torch_model.json";
-
-    // Load the network
-    printf("Loading network from %s...\n", dataset_path);
-    Network *network = initialize_network_from_file(dataset_path);
+    printf("Loading network from %s...\n", model_architecrure);
+    Network *network = initialize_network_from_file(model_architecrure, 10, 10, 2);
     if (!network) {
         printf("Error: Failed to load network.\n");
         return;
     }
 
-    // Load the NMNIST dataset
-    printf("Loading train dataset from %s...\n", network_config_path_train);
-    NMNISTDataset *dataset_train = load_nmnist_dataset(network_config_path_train, 1600, true, 10); // Load up to 160 samples
+    load_weights_from_json(network, model_weights);
 
+    printf("Weights were read succesfully...\n");
+}
+
+
+void train_test() {
+    const char *network_config_path_train = "C:/Users/karol/Desktop/karol/agh/praca_snn/data/NMNIST/Train";   
+    const char *network_config_path_test = "C:/Users/karol/Desktop/karol/agh/praca_snn/data/NMNIST/Test"; 
+    const char *dataset_path = "snn_nmnist_model.json";
+
+    // Load the network
+    printf("Loading network from %s...\n", dataset_path);
+    Network *network = initialize_network_from_file(dataset_path, 34, 34, 2);
+    if (!network) {
+        printf("Error: Failed to load network.\n");
+        return;
+    }
+
+    load_weights_from_json(network, "snn_weights.json");
+
+    //sample_test(network);
+
+    // Load the NMNIST dataset
+    //printf("Loading train dataset from %s...\n", network_config_path_train);
+    //NMNISTDataset *dataset_train = load_nmnist_dataset(network_config_path_train, 1600, false, true, 10); // Load up to 160 samples
+    
+    
     // Train the network
-    printf("Training the network...\n");
-    train(network, dataset_train);
+    //printf("Training the network...\n");
+    //train(network, dataset_train);
+
 
     printf("Loading test dataset from %s...\n", network_config_path_test);
-    NMNISTDataset *dataset_test = load_nmnist_dataset(network_config_path_test, 400, true, 10); // Load up to 160 samples
+    NMNISTDataset *dataset_test = load_nmnist_dataset(network_config_path_test, 1000, false, true, 10); // Load up to 160 samples
 
 
     printf("Testing the network accuracy...\n");
@@ -399,7 +431,7 @@ void train_test() {
     
     // Clean up
     free_nmnist_dataset(dataset_test);
-    free_nmnist_dataset(dataset_train);
+    //free_nmnist_dataset(dataset_train);
     free_network(network);
 
     printf("Training test completed successfully.\n");
