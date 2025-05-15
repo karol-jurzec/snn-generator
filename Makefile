@@ -12,7 +12,7 @@ CC = gcc
 CFLAGS = -Wall -Wextra -g -I$(INCLUDE_DIR) -I$(JSON_C_INCLUDE) -I$(OPENBLAS_INCLUDE) -I$(OPENBLAS_INCLUDE) #-I$(HDF5_INCLUDE) 
 
 LDFLAGS = -L$(JSON_C_LIB) -L$(OPENBLAS_LIB) -L$(OPENBLAS_LIB) # -L$(HDF5_LIB)
-LDLIBS = -ljson-c -lpthread -lm -lopenblas #-lhdf5
+LDLIBS = -ljson-c -lpthread -lm -lopenblas -lmatio#-lhdf5
 
 # Directories
 SRC_DIR = src

@@ -4,12 +4,7 @@
 #include <string.h>
 
 #include "../include/network.h"
-#include "../include/layers/maxpool2d_layer.h"
-#include "../include/utils/nmnist_loader.h"
-#include "../include/utils/network_logger.h"
-#include "../include/models/lif_neuron.h"
-#include "../include/layers/spiking_layer.h"
-#include "../include/utils/mse_count_loss.h"
+#include "utils/network_logger.h"
 
 #define LEARNING_RATE 0.001
 //#define EPOCHS 10
@@ -210,7 +205,7 @@ void initialize_network_with_bptt(Network *network, int time_steps) {
     }
 }
 
-void train(Network *network, NMNISTDataset *dataset) {
+void train(Network *network, Dataset *dataset) {
     printf("Starting training...\n");
 
     int epochs = 50;
@@ -234,7 +229,7 @@ void train(Network *network, NMNISTDataset *dataset) {
 
             for (size_t batch_idx = 0; batch_idx < actual_batch_size; batch_idx++) {
                 size_t sample_idx = batch_start + batch_idx;
-                NMNISTSample *sample = &dataset->samples[sample_idx];
+                Sample *sample = &dataset->samples[sample_idx];
 
                 int max_time = sample->events[sample->num_events - 1].timestamp;
                 
@@ -351,9 +346,64 @@ void train(Network *network, NMNISTDataset *dataset) {
     printf("Training complete!\n");
 }
 
-void sample_test(Network *network) {
-    size_t input_size = 2 * 306 * 34 * 34;
-    float *input = load_flat_spike_input("converted_input.txt", input_size);
+int is_whitespace_only(const char *str) {
+    while (*str) {
+        if (!isspace((unsigned char)*str)) return 0;
+        str++;
+    }
+    return 1;
+}
+
+float* load_sample_file(const char* filepath) {
+    size_t total_values = 84 * 2 * 10 * 10;
+    float *input = (float*)malloc(total_values * sizeof(float));
+    if (!input) {
+        fprintf(stderr, "Memory allocation failed.\n");
+        return NULL;
+    }
+
+    FILE *file = fopen(filepath, "r");
+    if (!file) {
+        fprintf(stderr, "Failed to open file: %s\n", filepath);
+        free(input);
+        return NULL;
+    }
+
+    size_t idx = 0;
+    char line[2048];
+
+    while (fgets(line, sizeof(line), file)) {
+        // Skip metadata or whitespace-only lines
+        if (strstr(line, "Timestep") || strstr(line, "Channel") || is_whitespace_only(line))
+            continue;
+
+        // Parse space-separated floats
+        char *token = strtok(line, " ");
+        while (token && idx < total_values) {
+            float value = strtof(token, NULL);
+            input[idx++] = value;
+            token = strtok(NULL, " ");
+        }
+    }
+
+    fclose(file);
+
+    if (idx != total_values) {
+        fprintf(stderr, "Expected %zu values, but got %zu\n", total_values, idx);
+        free(input);
+        return NULL;
+    }
+
+    return input;
+}
+
+void sample_test(Network *network, const char* path) {
+    size_t input_size = 2 * 84 * 10 * 10;
+    float *input = load_sample_file(path);
+    if (!input) {
+        fprintf(stderr, "Input loading failed.\n");
+        return;
+    }
 
     if (!input) {
         fprintf(stderr, "Input loading failed.\n");
@@ -361,9 +411,9 @@ void sample_test(Network *network) {
     }
 
     // Now run through the network, one frame at a time:
-    size_t frame_size = 2 * 34 * 34;
+    size_t frame_size = 2 * 10 * 10;
 
-    for (int t = 0; t < 306; ++t) {
+    for (int t = 0; t < 84; ++t) {
         float *frame = &input[t * frame_size];
         network->layers[0]->forward(network->layers[0], frame, frame_size, 0);
         for (size_t l = 1; l < network->num_layers; l++) {
@@ -373,10 +423,9 @@ void sample_test(Network *network) {
                 network->layers[l - 1]->output_size, 0);
         }
 
-        //log_spikes(network, 0, 0, t, 0);
-        log_outputs(network, 0, 0, t);
-        log_inputs(network, 0, 0, t);
-
+       log_spikes(network, 0, 0, t, 0);
+       //log_outputs(network, 0, 0, t);
+       //log_inputs(network, 0, 0, t);
         
     }
 
@@ -391,18 +440,17 @@ void sample_test(Network *network) {
     printf("TESTING HAS BEEN FINISHED\n");
 }
 
-float test(Network *network, NMNISTDataset *dataset) {
+float test(Network *network, Dataset *dataset) {
     size_t correct_predictions = 0;
     size_t total_samples = dataset->num_samples;
 
     for (size_t i = 0; i < total_samples; i++) {
-        NMNISTSample *sample = &dataset->samples[i];
+        Sample *sample = &dataset->samples[i];
 
         int max_time = sample->events[sample->num_events - 1].timestamp;
-        float *input = convert_events_to_input(
-            sample->events, sample->num_events, TIME_BINS, 34, 34, max_time);
+        float *input = sample->input;
 
-        size_t input_size_per_bin = 2 * 34 * 34;
+        size_t input_size_per_bin = dataset->input_channels * dataset->input_width * dataset->input_height;
 
         for (size_t l = 0; l < network->num_layers; l++) {
             if (network->layers[l]->is_spiking) {
@@ -410,15 +458,16 @@ float test(Network *network, NMNISTDataset *dataset) {
             }
         }
 
-        for (int t = 0; t < TIME_BINS; t++) {
+        for (int t = 0; t < sample->num_bins; t++) {
             float *frame = &input[t * input_size_per_bin];
             network->layers[0]->forward(network->layers[0], frame, input_size_per_bin, 0);
             for (size_t j = 1; j < network->num_layers; j++) {
                 network->layers[j]->forward(network->layers[j], network->layers[j - 1]->output,
                                             network->layers[j - 1]->output_size, 0);
             }
-            if(i % 100 == 0) {
-                log_spikes(network, 0, i, t, sample->label);
+            if(i % 1000 == 0) {
+                //log_inputs(network, 0, i, t);
+                //log_spikes(network, 0, i, t, sample->label);
             }
         }
 

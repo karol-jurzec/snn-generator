@@ -11,7 +11,7 @@
         },
         {
             "type": "SpikingLayer",
-            "beta": 0.949999988079071,
+            "beta": 0.95,
             "neuron_type": "Leaky",
             "spike_grad": "atan",
             "init_hidden": true,
@@ -28,7 +28,7 @@
         },
         {
             "type": "SpikingLayer",
-            "beta": 0.949999988079071,
+            "beta": 0.95,
             "neuron_type": "Leaky",
             "spike_grad": "atan",
             "init_hidden": true,
@@ -48,7 +48,7 @@
         },
         {
             "type": "SpikingLayer",
-            "beta": 0.949999988079071,
+            "beta": 0.95,
             "neuron_type": "Leaky",
             "spike_grad": "atan",
             "init_hidden": true,
