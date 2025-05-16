@@ -25,6 +25,8 @@ typedef enum {
 // Event processing functions
 size_t denoise_events(SpikeEvent *events, size_t num_events, unsigned int filter_time);
 void stabilize_nmnist_events(SpikeEvent *events, size_t num_events);
+int16_t ****events_to_single_frame(SpikeEvent *events, size_t num_events,
+    int width, int height);
 
 // Frame conversion functions
 int16_t ****events_to_frames(SpikeEvent *events, size_t num_events,

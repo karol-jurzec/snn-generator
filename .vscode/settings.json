@@ -25,7 +25,8 @@
         "stdint.h": "c",
         "dataset_loader.h": "c",
         "events.h": "c",
-        "stmnist_loader.h": "c"
+        "stmnist_loader.h": "c",
+        "izhikevich_neuron.h": "c"
     },
 "C_Cpp.errorSquiggles": "disabled"
 }

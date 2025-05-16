@@ -7,12 +7,16 @@ OPENBLAS_LIB = /mingw64/lib
 #HDF5_INCLUDE = /c/Program\ Files/HDF_Group/HDF5/1.14.6/include
 #HDF5_LIB = /c/Program\ Files/HDF_Group/HDF5/1.14.6/lib
 
+SDL2_INCLUDE = /mingw64/include/SDL2
+SDL2_LIB = /mingw64/lib
+
 # Compiler and Flags
 CC = gcc  
-CFLAGS = -Wall -Wextra -g -I$(INCLUDE_DIR) -I$(JSON_C_INCLUDE) -I$(OPENBLAS_INCLUDE) -I$(OPENBLAS_INCLUDE) #-I$(HDF5_INCLUDE) 
+CFLAGS = -Wall -Wextra -g -I$(INCLUDE_DIR) -I$(JSON_C_INCLUDE) -I$(OPENBLAS_INCLUDE) -I$(SDL2_INCLUDE)
 
-LDFLAGS = -L$(JSON_C_LIB) -L$(OPENBLAS_LIB) -L$(OPENBLAS_LIB) # -L$(HDF5_LIB)
-LDLIBS = -ljson-c -lpthread -lm -lopenblas -lmatio#-lhdf5
+LDFLAGS = -L$(JSON_C_LIB) -L$(OPENBLAS_LIB) -L$(SDL2_LIB)
+LDLIBS = -lmingw32 -lSDL2main -lSDL2 -ljson-c -lpthread -lm -lopenblas -lmatio 
+
 
 # Directories
 SRC_DIR = src
@@ -38,7 +42,8 @@ all: $(TARGET)
 # Build Target
 $(TARGET): $(OBJ_FILES)
 	@echo "Linking $@..."
-	$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@
+	$(CC) -mconsole $(LDFLAGS) $^ $(LDLIBS) -o $@
+
 
 # Compile Object Files
 $(BUILD_DIR)/%.o: $(SRC_DIR)/%.c

@@ -9,15 +9,16 @@
 #include "layers/spiking_layer.h"
 #include "utils/mse_count_loss.h"
 
-#define NETWORK_FORWARD_FUNC(name) void (*name)(void *self, float *input, size_t input_size)
+typedef struct Network Network;  // Forward declaration of Network
 
-typedef struct {
-    NETWORK_FORWARD_FUNC(forward);  // Forward function pointer for layers
+#define NETWORK_FORWARD_FUNC(name) void (*name)(Network *self, float *input, size_t input_size, int time_step)
 
+struct Network {
+    NETWORK_FORWARD_FUNC(forward);
 
-    LayerBase **layers;   // Array of pointers to layers (polymorphic)
-    size_t num_layers;    // Number of layers in the network
-} Network;
+    LayerBase **layers;
+    size_t num_layers;
+};
 
 Network *create_network(size_t num_layers);
 void add_layer(Network *network, LayerBase *layer, size_t index);

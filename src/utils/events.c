@@ -122,6 +122,24 @@ static int16_t ****allocate_frames(int num_bins, int height, int width) {
     return frames;
 }
 
+int16_t ****events_to_single_frame(SpikeEvent *events, size_t num_events,
+    int width, int height) {
+    if (num_events == 0) return NULL;
+
+    int num_bins = 1; // single frame
+
+    int16_t ****frames = allocate_frames(num_bins, height, width);
+    if (!frames) return NULL;
+
+    for (size_t i = 0; i < num_events; i++) {
+        SpikeEvent e = events[i];
+        if (e.polarity > 1 || e.x >= width || e.y >= height) continue;
+        frames[0][e.polarity][e.y][e.x] += 1;
+    }
+
+    return frames;
+}
+
 int16_t ****events_to_frames(SpikeEvent *events, size_t num_events,
                            int width, int height, FrameSlicingMode mode,
                            int mode_param, float overlap, int *out_num_bins) {

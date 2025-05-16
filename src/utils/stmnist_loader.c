@@ -1,4 +1,10 @@
 #include "../../include/utils/stmnist_loader.h"
+#include <sys/stat.h>
+#include <string.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <dirent.h>
+
 
 // Forward declarations
 static int scan_directory_for_mat_files(const char *base_dir, char ***paths, int **labels, size_t *count);
@@ -91,8 +97,17 @@ static int scan_directory_for_mat_files(const char *base_dir, char ***paths, int
 
     struct dirent *entry;
     while ((entry = readdir(root))) {
-        if (entry->d_type != DT_DIR) continue;
+        // Skip "." and ".."
         if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) continue;
+
+        // Build full path for this entry
+        char entry_path[1024];
+        snprintf(entry_path, sizeof(entry_path), "%s/%s", base_dir, entry->d_name);
+
+        // Use stat to check if entry is a directory
+        struct stat st;
+        if (stat(entry_path, &st) == -1) continue;
+        if (!S_ISDIR(st.st_mode)) continue;  // Not a directory, skip
 
         char class_dir[1024];
         snprintf(class_dir, sizeof(class_dir), "%s/%s", base_dir, entry->d_name);

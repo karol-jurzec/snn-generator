@@ -2,6 +2,8 @@
 #define SPIKING_LAYER_H
 
 #include <stddef.h>
+#include <string.h>
+
 #include "../models/model_base.h"  // Base model for neurons
 #include "layer_base.h"            // Base layer  
 

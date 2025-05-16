@@ -50,20 +50,15 @@ void forward(Network *network, float *input, size_t input_size, int time_step) {
     for (size_t i = 0; i < network->num_layers; i++) {
         LayerBase *layer = network->layers[i];
         
-        // Store the previous output if needed
-        // TODO: check why this makes a segmentation fault 
-
-        if (time_step > 0 && layer->output_history != NULL) {
-            memcpy(&layer->output_history[(time_step-1)*layer->output_size], 
-                   layer->output, 
-                   layer->output_size * sizeof(float));
-        }
-        
         layer->forward(layer, current_input, current_input_size, time_step);
         
         current_input = layer->output;
         current_input_size = layer->output_size;
+
+        log_spikes(network, 0, 0, time_step, 0);
     }
+
+    printf("\n");
 }
 
 float* backward(Network *network, float *gradients, int time_step) {
@@ -348,7 +343,7 @@ void train(Network *network, Dataset *dataset) {
 
 int is_whitespace_only(const char *str) {
     while (*str) {
-        if (!isspace((unsigned char)*str)) return 0;
+    //    if (!isspace((unsigned char)*str)) return 0;
         str++;
     }
     return 1;
