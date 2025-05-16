@@ -4,6 +4,8 @@
 #include <stddef.h>
 #include "../models/model_base.h"  // Base model for neurons
 #include "layer_base.h"            // Base layer  
+#include <string.h>
+
 
 typedef struct {
     LayerBase base;             // Inherits LayerBase for polymorphic forward

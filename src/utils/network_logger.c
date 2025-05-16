@@ -1,6 +1,8 @@
 #include "../../include/utils/network_logger.h"
 #include "../../include/layers/spiking_layer.h"
 
+void create_directory(const char *path);
+
 void log_weights(Network *network, int epoch, int batch) {
     char filename[50];
     snprintf(filename, sizeof(filename), "out/weights/weights_epoch_%d_batch_%d.txt", epoch, batch);
@@ -143,7 +145,7 @@ void log_outputs(Network *network, int epoch, int sample, int t) {
 void create_directory(const char *path) {
     struct stat st = {0};
     if (stat(path, &st) == -1) {
-        mkdir(path, 0700);
+        mkdir(path);
     }
 }
 

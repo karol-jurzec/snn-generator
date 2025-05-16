@@ -12,7 +12,7 @@ void network_loader_test();
 void flatten_test();
 void conv2d_test();
 void linear_test();
-void print_output();
+void print_output(float *output, size_t out_channels, size_t output_dim) ;
 void generate_synthetic_input(float *input, size_t size);
 void print_output_spikes(float *output, size_t num_neurons);
 void nmnist_loader_test();
