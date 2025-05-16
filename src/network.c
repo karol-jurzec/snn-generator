@@ -55,7 +55,7 @@ void forward(Network *network, float *input, size_t input_size, int time_step) {
         current_input = layer->output;
         current_input_size = layer->output_size;
 
-        log_spikes(network, 0, 0, time_step, 0);
+        //log_spikes(network, 0, 0, time_step, 0);
     }
 
     printf("\n");
