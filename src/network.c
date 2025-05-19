@@ -466,10 +466,10 @@ float test(Network *network, Dataset *dataset) {
                 network->layers[j]->forward(network->layers[j], network->layers[j - 1]->output,
                                             network->layers[j - 1]->output_size, 0);
             }
-            if(i % 1000 == 0) {
+            //if(i % 100000 == 0) {
                 //log_inputs(network, 0, i, t);
-                //log_spikes(network, 0, i, t, sample->label);
-            }
+            //    log_spikes(network, 0, i, t, sample->label);
+            //}
         }
 
         SpikingLayer *output_layer = (SpikingLayer *)network->layers[network->num_layers - 1];

@@ -18,9 +18,10 @@ void print_output_spikes(float *output, size_t num_neurons);
 void nmnist_loader_test();
 void discretization_test();
 void loader_test();
-void train_test();
+
 void test_network_training();
 void stmnist_test();
+void nmnist_test();
 
 void iris_classification_example(); // fully connected network 
 void hor_vert_dataset();

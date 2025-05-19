@@ -26,7 +26,8 @@
         "dataset_loader.h": "c",
         "events.h": "c",
         "stmnist_loader.h": "c",
-        "network.h": "c"
+        "network.h": "c",
+        "snn_plot.h": "c"
     },
 "C_Cpp.errorSquiggles": "disabled"
 }

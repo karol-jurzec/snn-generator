@@ -3,6 +3,7 @@
 #include <string.h>
 #include <time.h>
 #include <math.h>
+#include <sys/time.h>
 
 #include "../include/tests.h"
 #include "../include/network.h"
@@ -378,6 +379,12 @@ void discretization_test() {
     */
 }
 
+static double now_seconds(void) {
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    return tv.tv_sec + tv.tv_usec * 1e-6;
+}
+
 void stmnist_test() {
     const char *model_architecrure = "scnn_stmnist_architecture.json";
     const char *model_weights = "scnn_stmnist_weights_bs_64.json";
@@ -397,18 +404,23 @@ void stmnist_test() {
     //sample_test(network, "C:/Users/karol/Desktop/karol/agh/praca_snn/input_samples/sample_01.txt");
 
     printf("Loading test dataset from %s...\n", dataset_path_test);
-    Dataset *dataset_test = load_dataset(dataset_path_test, FORMAT_STMNIST, 500, false, false);
+    Dataset *dataset_test = load_dataset(dataset_path_test, FORMAT_STMNIST, 1, false, false);
 
     printf("Testing the network accuracy...\n");
 
+    double t0 = now_seconds();
+
     test(network, dataset_test);
+
+    double t1 = now_seconds();
+    printf("train_test() took %.6f seconds\n", t1 - t0);
     free_network(network);
 
     printf("Test was completed successfully.\n");
 }
 
 
-void train_test() {
+void nmnist_test() {
     const char *network_config_path_train = "C:/Users/karol/Desktop/karol/agh/praca_snn/data/NMNIST/Train";   
     const char *network_config_path_test = "C:/Users/karol/Desktop/karol/agh/praca_snn/data/NMNIST/Test"; 
     const char *dataset_path = "snn_nmnist_architecture.json";

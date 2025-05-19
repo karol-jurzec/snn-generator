@@ -66,8 +66,9 @@ int main(int argc, char *argv[]) {
 
     double t0 = now_seconds();
 
-    //train_test();
+    
     //loader_test();
+    nmnist_test();
     stmnist_test();
 
     double t1 = now_seconds();
