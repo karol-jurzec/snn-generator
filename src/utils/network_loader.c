@@ -23,8 +23,8 @@ ModelBase **initialize_neurons(const char *neuron_type, size_t num_neurons, stru
     if (strcmp(neuron_type, "Leaky") == 0) {
         float beta = json_object_get_double(json_object_object_get(neuron_config, "beta"));
         for (size_t i = 0; i < num_neurons; i++) {
-            neurons[i] = (ModelBase *)malloc(sizeof(LIFNeuron));
-            lif_initialize((LIFNeuron *)neurons[i], 0.0f,1.0f, 0.0f, beta);
+           //neurons[i] = (ModelBase *)malloc(sizeof(LIFNeuron));
+            //lif_initialize((LIFNeuron *)neurons[i], 0.0f,1.0f, 0.0f, beta);
         }
     }
     // rest neuron types etc... 
@@ -93,12 +93,15 @@ void parse_and_add_layer(Network *network, struct json_object *layer_config, siz
         //size_t num_neurons = json_object_get_int(json_object_object_get(layer_config, "num_neurons"));
         int num_neurons = current_channels * current_height * current_width;
         const char *neuron_type = json_object_get_string(json_object_object_get(layer_config, "neuron_type"));
-        ModelBase **neurons = initialize_neurons(neuron_type, num_neurons, layer_config);
+        float beta = json_object_get_double(json_object_object_get(layer_config, "beta"));
+        //ModelBase **neurons = initialize_neurons(neuron_type, num_neurons, layer_config);
 
         SpikingLayer *spiking_layer = (SpikingLayer *)malloc(sizeof(SpikingLayer));
 
 
-        spiking_initialize(spiking_layer, num_neurons, neurons);
+        //spiking_initialize(spiking_layer, num_neurons, neurons);
+
+        spiking_initialize(spiking_layer, num_neurons, 0.0f, 1.0f, 0.0f, beta);
 
 
         add_layer(network, (LayerBase *)spiking_layer, index);

@@ -27,7 +27,10 @@
         "events.h": "c",
         "stmnist_loader.h": "c",
         "network.h": "c",
-        "snn_plot.h": "c"
+        "snn_plot.h": "c",
+        "network_optim.h": "c",
+        "immintrin.h": "c",
+        "conv2d_layer.h": "c"
     },
 "C_Cpp.errorSquiggles": "disabled"
 }

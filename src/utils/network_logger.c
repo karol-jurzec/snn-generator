@@ -171,9 +171,9 @@ void log_membranes(Network *network, int epoch, int sample, int t) {
             fprintf(file, "Layer %zu\n", l);
 
             SpikingLayer *spiking_layer = (SpikingLayer *)layer;
-            for (size_t i = 0; i < spiking_layer->num_neurons; i++) {
-                fprintf(file, "%f\n", spiking_layer->neurons[i]->v);
-            }
+            //for (size_t i = 0; i < spiking_layer->num_neurons; i++) {
+            //    fprintf(file, "%f\n", spiking_layer->neurons[i]->v);
+            //}
             fclose(file);
         }
     }

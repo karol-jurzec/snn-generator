@@ -25,6 +25,7 @@ void nmnist_test();
 
 void iris_classification_example(); // fully connected network 
 void hor_vert_dataset();
+void benchmark_single_inference(int num_runs);
 
 
 #endif // TESTS_H

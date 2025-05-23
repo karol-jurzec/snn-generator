@@ -404,7 +404,7 @@ void stmnist_test() {
     //sample_test(network, "C:/Users/karol/Desktop/karol/agh/praca_snn/input_samples/sample_01.txt");
 
     printf("Loading test dataset from %s...\n", dataset_path_test);
-    Dataset *dataset_test = load_dataset(dataset_path_test, FORMAT_STMNIST, 1, false, false);
+    Dataset *dataset_test = load_dataset(dataset_path_test, FORMAT_STMNIST, 15, false, false);
 
     printf("Testing the network accuracy...\n");
 
@@ -414,6 +414,11 @@ void stmnist_test() {
 
     double t1 = now_seconds();
     printf("train_test() took %.6f seconds\n", t1 - t0);
+
+    optimize_network(network);
+
+    test(network, dataset_test);
+
     free_network(network);
 
     printf("Test was completed successfully.\n");
@@ -435,35 +440,15 @@ void nmnist_test() {
 
     load_weights_from_json(network, "snn_nmnist_weights_bs_32.json");
 
-    //sample_test(network);
-
-    // Load the NMNIST dataset
-    //printf("Loading train dataset from %s...\n", network_config_path_train);
-    //NMNISTDataset *dataset_train = load_nmnist_dataset(network_config_path_train, 1600, false, true, 10); // Load up to 160 samples
-    
-    //Dataset *dataset_train = load_dataset(network_config_path_train, FORMAT_NMNIST, 1600, false, true);
-    //if (!dataset_train) {
-    //   fprintf(stderr, "Failed to load dataset\n");
-    //   return 1;
-    //}
-    
-    // Train the network
-    //printf("Training the network...\n");
-    //train(network, dataset_train);
-
-
     printf("Loading test dataset from %s...\n", network_config_path_test);
     Dataset *dataset_test = load_dataset(network_config_path_test, FORMAT_NMNIST, 100, false, true);
 
-
     printf("Testing the network accuracy...\n");
-    test(network, dataset_test);  // Call after training
+    test(network, dataset_test);  // Call after training  
     
-    // Clean up
-   //_dataset(dataset_test);
-    //free_nmnist_dataset(dataset_train);
-    free_network(network);
+    optimize_network(network);
 
+    free_network(network);
     printf("Training test completed successfully.\n");
 }
 
@@ -513,12 +498,12 @@ SpikingLayer* create_spiking_layer(size_t num_neurons) {
     // Using LIF neurons as default
     ModelBase **neurons = (ModelBase**)malloc(num_neurons * sizeof(ModelBase*));
     for (size_t i = 0; i < num_neurons; i++) {
-        neurons[i] = (ModelBase*)malloc(sizeof(LIFNeuron));
+   //     neurons[i] = (ModelBase*)malloc(sizeof(LIFNeuron));
         // Initialize LIF neuron here
 
-        lif_initialize((LIFNeuron *)neurons[i], 0.0f, 0.5f, 0.0f, 0.5f);
+   //     lif_initialize((LIFNeuron *)neurons[i], 0.0f, 0.5f, 0.0f, 0.5f);
     }
-    spiking_initialize(layer, num_neurons, neurons);
+   // spiking_initialize(layer, num_neurons, neurons);
     return layer;
 }
 
@@ -1129,6 +1114,49 @@ void test_hor_vert_dataset(Network* net, float** images, int* labels, int num_sa
         log_gradients(net, epoch, 0);
         printf("Epoch %d, Loss: %.4f\n", epoch + 1, total_loss / num_batches);
     }
+}
+
+void benchmark_single_inference(int num_runs) {
+    const char *network_json = "snn_nmnist_architecture.json";
+    const char *weights_json = "snn_nmnist_weights_bs_32.json";
+    const char *test_path = "C:/Users/karol/Desktop/karol/agh/praca_snn/data/NMNIST/Test";
+
+    double total_load_time = 0.0, total_infer_time = 0.0, total_time = 0.0;
+
+    printf("Loading dataset...\n");
+    Dataset *dataset_test = load_dataset(test_path, FORMAT_NMNIST, 50, false, true);
+
+    for (int i = 0; i < num_runs; i++) {
+        clock_t start_total = clock();
+
+        // Load network
+        clock_t start_load = clock();
+        Network *network = initialize_network_from_file(network_json, 34, 34, 2);
+        load_weights_from_json(network, weights_json);
+        clock_t end_load = clock();
+
+        // Use only one sample
+        Sample *sample = &dataset_test->samples[0];
+
+        clock_t start_infer = clock();
+        single_inference(network, sample);
+        clock_t end_infer = clock();
+
+        clock_t end_total = clock();
+
+        total_load_time  += (double)(end_load - start_load) / CLOCKS_PER_SEC;
+        total_infer_time += (double)(end_infer - start_infer) / CLOCKS_PER_SEC;
+        total_time       += (double)(end_total - start_total) / CLOCKS_PER_SEC;
+
+        free_network(network);
+    }
+
+    printf("\n--- Benchmark (avg over %d runs) ---\n", num_runs);
+    printf("Sredni czas ladowania sieci:  %.6f s\n", total_load_time / num_runs);
+    printf("Sredni czas inferencji:       %.6f s\n", total_infer_time / num_runs);
+    printf("Sredni czas calkowity:        %.6f s\n", total_time / num_runs);
+
+    free_dataset(dataset_test);
 }
 
 

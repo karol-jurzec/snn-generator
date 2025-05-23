@@ -6,6 +6,7 @@
 
 #include "../include/network.h"
 #include "utils/network_logger.h"
+#include "utils/network_optim.h"
 
 #define LEARNING_RATE 0.001
 //#define EPOCHS 10
@@ -100,9 +101,9 @@ float compute_loss(Network *network, MSECountLoss *loss_fn, int *labels, int bat
     
     // Collect spike counts for all samples in batch
     for (int b = 0; b < batch_size; b++) {
-        for (size_t n = 0; n < output_layer->num_neurons; n++) {
-            LIFNeuron *neuron = (LIFNeuron *)output_layer->neurons[n];
-            loss_fn->spike_counts[b * output_layer->num_neurons + n] = (float)neuron->spike_count;
+        for (size_t n = 0; n <  output_layer->base.num_inputs; n++) {
+            // LIFNeuron *neuron = (LIFNeuron *)output_layer->neurons[n];
+            loss_fn->spike_counts[b *  output_layer->base.num_inputs + n] = (float)output_layer->neuron_layer.spike_count[n]; 
         }
     }
     
@@ -129,8 +130,8 @@ void free_network(Network *network) {
 }
 
 // Compute spike probabilities using softmax
-void compute_probabilities(float *spike_counts, size_t num_neurons, float *probabilities) {
-    float max_value = -INFINITY;
+void compute_probabilities(int *spike_counts, size_t num_neurons, float *probabilities) {
+    int max_value = -INFINITY;
     float sum_exp = 0.0f;
 
     // Find the maximum spike count for numerical stability
@@ -167,12 +168,12 @@ void reset_layer_states(Network *network) {
     for (size_t i = 0; i < network->num_layers; i++) {
         LayerBase *layer = network->layers[i];
         if (layer->is_spiking) {
-            SpikingLayer *slayer = (SpikingLayer *)layer;
-            for (size_t n = 0; n < slayer->num_neurons; n++) {
-                LIFNeuron *neuron = (LIFNeuron *)slayer->neurons[n];
-                neuron->spike_count = 0;
-                neuron->base.v = 0.0f;
-            }
+            //SpikingLayer *slayer = (SpikingLayer *)layer;
+           // for (size_t n = 0; n < slayer->num_neurons; n++) {
+                //LIFNeuron *neuron = (LIFNeuron *)slayer->neurons[n];
+                //neuron->spike_count = 0;
+                //neuron->base.v = 0.0f;
+          //  }
         }
         
         // Clear temporal histories if they exist
@@ -184,26 +185,26 @@ void reset_layer_states(Network *network) {
 
 // Initialize network with temporal buffers
 void initialize_network_with_bptt(Network *network, int time_steps) {
-    for (size_t i = 0; i < network->num_layers; i++) {
-        LayerBase *layer = network->layers[i];
-        layer->time_steps = time_steps;
+    // for (size_t i = 0; i < network->num_layers; i++) {
+    //     LayerBase *layer = network->layers[i];
+    //     layer->time_steps = time_steps;
         
-        // Allocate history buffers based on layer type
-        if (layer->is_spiking) {
-            SpikingLayer *slayer = (SpikingLayer *)layer;
-            slayer->membrane_history = (float*)malloc(time_steps * slayer->num_neurons * sizeof(float));
-            slayer->spike_history = (int*)malloc(time_steps * slayer->num_neurons * sizeof(int));
-        }
+    //     // Allocate history buffers based on layer type
+    //     if (layer->is_spiking) {
+    //         SpikingLayer *slayer = (SpikingLayer *)layer;
+    //         slayer->membrane_history = (float*)malloc(time_steps * slayer->num_neurons * sizeof(float));
+    //         slayer->spike_history = (int*)malloc(time_steps * slayer->num_neurons * sizeof(int));
+    //     }
         
-        // Allocate output history for all layers
-        layer->output_history = (float*)malloc(time_steps * layer->output_size * sizeof(float));
+    //     // Allocate output history for all layers
+    //     layer->output_history = (float*)malloc(time_steps * layer->output_size * sizeof(float));
         
-        // Special case for MaxPool
-        if (layer->layer_type == LAYER_MAXPOOL2D) {
-            MaxPool2DLayer *mpool = (MaxPool2DLayer *)layer;
-            mpool->max_indices_history = (size_t*)malloc(time_steps * mpool->base.output_size * sizeof(size_t));
-        }
-    }
+    //     // Special case for MaxPool
+    //     if (layer->layer_type == LAYER_MAXPOOL2D) {
+    //         MaxPool2DLayer *mpool = (MaxPool2DLayer *)layer;
+    //         mpool->max_indices_history = (size_t*)malloc(time_steps * mpool->base.output_size * sizeof(size_t));
+    //     }
+    // }
 }
 
 void train(Network *network, Dataset *dataset) {
@@ -262,7 +263,7 @@ void train(Network *network, Dataset *dataset) {
                 }
 
                 SpikingLayer *output_layer = (SpikingLayer *)network->layers[network->num_layers - 1];
-                if (output_layer->num_neurons == 0 || output_layer->neurons == NULL) {
+                if (output_layer->base.num_inputs == 0 || output_layer->neuron_layer.spike_count == NULL) {
                     fprintf(stderr, "Error: Output layer neurons not initialized.\n");
                     free(input);
                     continue;
@@ -274,10 +275,9 @@ void train(Network *network, Dataset *dataset) {
                 float max_spikes = -1.0f;
                 int predicted_label = -1;
 
-                for (size_t n = 0; n < output_layer->num_neurons; n++) {
-                    LIFNeuron *neuron = (LIFNeuron *)output_layer->neurons[n];
-                    float spike_count = (float)neuron->spike_count;
-                    mse_loss.spike_counts[batch_idx * output_layer->num_neurons + n] = spike_count;
+                for (size_t n = 0; n < output_layer->base.num_inputs; n++) {
+                    float spike_count = (float)output_layer->neuron_layer.spike_count[n];
+                    mse_loss.spike_counts[batch_idx * output_layer->base.num_inputs + n] = spike_count;
 
                     // Accuracy prediction logic
                     if (spike_count > max_spikes) {
@@ -430,13 +430,13 @@ void sample_test(Network *network, const char* path) {
         
     }
 
-    SpikingLayer *output_layer = (SpikingLayer *)network->layers[network->num_layers - 1];
-    float spike_counts[output_layer->num_neurons];
-    for (size_t n = 0; n < output_layer->num_neurons; n++) {
-        LIFNeuron *neuron = (LIFNeuron *)output_layer->neurons[n];
-        spike_counts[n] = (float)neuron->spike_count;
+    // SpikingLayer *output_layer = (SpikingLayer *)network->layers[network->num_layers - 1];
+    // float spike_counts[output_layer->num_neurons];
+    // for (size_t n = 0; n < output_layer->num_neurons; n++) {
+    //     LIFNeuron *neuron = (LIFNeuron *)output_layer->neurons[n];
+    //     spike_counts[n] = (float)neuron->spike_count;
         
-    }
+    // }
 
     printf("TESTING HAS BEEN FINISHED\n");
 }
@@ -466,26 +466,26 @@ float test(Network *network, Dataset *dataset) {
                 network->layers[j]->forward(network->layers[j], network->layers[j - 1]->output,
                                             network->layers[j - 1]->output_size, 0);
             }
-            //if(i % 100000 == 0) {
+            if(i % 100000 == 0) {
                 //log_inputs(network, 0, i, t);
-            //    log_spikes(network, 0, i, t, sample->label);
-            //}
+                log_spikes(network, 0, i, t, sample->label);
+            }
         }
 
         SpikingLayer *output_layer = (SpikingLayer *)network->layers[network->num_layers - 1];
-        float spike_counts[output_layer->num_neurons];
-        for (size_t n = 0; n < output_layer->num_neurons; n++) {
-            LIFNeuron *neuron = (LIFNeuron *)output_layer->neurons[n];
-            spike_counts[n] = (float)neuron->spike_count;
+        //float spike_counts[output_layer->num_neurons];
+        //for (size_t n = 0; n < output_layer->num_neurons; n++) {
+        //    LIFNeuron *neuron = (LIFNeuron *)output_layer->neurons[n];
+        //    spike_counts[n] = (float)neuron->spike_count;
             
-        }
+        //}
 
-        float probabilities[output_layer->num_neurons];
-        compute_probabilities(spike_counts, output_layer->num_neurons, probabilities);
+        float probabilities[output_layer->base.num_inputs];
+        compute_probabilities(output_layer->neuron_layer.spike_count, output_layer->base.num_inputs, probabilities);
 
         int predicted_label = 0;
         float max_prob = probabilities[0];
-        for (size_t p = 1; p < output_layer->num_neurons; p++) {
+        for (size_t p = 1; p < output_layer->base.num_inputs; p++) {
             if (probabilities[p] > max_prob) {
                 max_prob = probabilities[p];
                 predicted_label = p;
@@ -506,4 +506,80 @@ float test(Network *network, Dataset *dataset) {
     return accuracy;
 }
 
+float single_inference(Network *network, Sample *sample) {
+    size_t input_size_per_bin = 2 * 34 * 34;
 
+    // Reset spike counts in parallel
+    #pragma omp parallel for
+    for (size_t l = 0; l < network->num_layers; l++) {
+        if (network->layers[l]->is_spiking) {
+            network->layers[l]->reset_spike_counts(network->layers[l]);
+        }
+    }
+
+    // Forward through time bins
+    for (int t = 0; t < sample->num_bins; t++) {
+        float *frame = &sample->input[t * input_size_per_bin];
+        network->layers[0]->forward(network->layers[0], frame, input_size_per_bin, 0);
+        
+        #pragma omp parallel for
+        for (size_t j = 1; j < network->num_layers; j++) {
+            network->layers[j]->forward(network->layers[j], 
+                                      network->layers[j - 1]->output,
+                                      network->layers[j - 1]->output_size, 
+                                      0);
+        }
+    }
+
+    // Classify
+    SpikingLayer *output_layer = (SpikingLayer *)network->layers[network->num_layers - 1];
+    //int spike_counts[output_layer->base.output_size];
+    float probabilities[output_layer->base.output_size];
+    
+    // Convert spike counts to float in parallel
+    //#pragma omp parallel for
+    //for (size_t n = 0; n < output_layer->base.output_size; n++) {
+    //    spike_counts[n] = output_layer->neuron_layer.spike_count[n];
+    //}
+
+    compute_probabilities(output_layer->neuron_layer.spike_count, output_layer->base.output_size, probabilities);
+
+    // Find max probability
+    int predicted_label = 0;
+    float max_prob = probabilities[0];
+    #pragma omp simd reduction(max:max_prob)
+    for (size_t p = 1; p < output_layer->base.output_size; p++) {
+        if (probabilities[p] > max_prob) {
+            max_prob = probabilities[p];
+            predicted_label = p;
+        }
+    }
+
+    return predicted_label == sample->label ? 1.0f : 0.0f;
+}
+
+void optimize_network(Network* network) {
+    for (size_t i = 0; i < network->num_layers; i++) {
+        if (network->layers[i]->layer_type == LAYER_SPIKING) {
+            SpikingLayer* spiking_layer = (SpikingLayer*)network->layers[i];
+            
+            // 1. Analiza aktywności z uwzględnieniem pełnych wymiarów
+            NeuronActivity activity = analyze_spiking_activity(spiking_layer, TIME_BINS);
+            
+            // 2. Optymalizacja poprzedniej warstwy Conv2D
+            if (i > 0 && network->layers[i-1]->layer_type == LAYER_CONV2D) {
+                optimize_conv2d_after_spiking((Conv2DLayer*)network->layers[i-1], activity);
+            }
+            
+            // 3. Optymalizacja następnej warstwy Conv2D (input channels)
+            if (i < network->num_layers-1 && network->layers[i+1]->layer_type == LAYER_CONV2D) {
+            //    optimize_conv2d_before_spiking((Conv2DLayer*)network->layers[i+1], activity);
+            }
+            
+            free(activity.inactive_neurons);
+        }
+    }
+    
+    // Po optymalizacji możemy zmniejszyć rozmiary buforów
+    // update_network_buffers(network);
+}

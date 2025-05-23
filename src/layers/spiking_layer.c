@@ -1,113 +1,108 @@
 #include <stdlib.h>
 #include <stdio.h>
-
+#include <immintrin.h>
+#ifdef _OPENMP
+#include <omp.h>
+#endif
 #include "../../include/layers/spiking_layer.h"
-#include "../../include/models/lif_neuron.h"
 
-void spiking_initialize(SpikingLayer *layer, size_t num_neurons, ModelBase **neuron_models) {
+// Windows-compatible aligned allocation
+#ifdef _WIN32
+#include <malloc.h>
+#define ALIGNED_ALLOC(alignment, size) _aligned_malloc(size, alignment)
+#define ALIGNED_FREE _aligned_free
+#else
+#define ALIGNED_ALLOC(alignment, size) aligned_alloc(alignment, size)
+#define ALIGNED_FREE free
+#endif
+
+void spiking_initialize(SpikingLayer *layer, size_t num_neurons, float v_rest, float threshold, float v_reset, float beta) {
     layer->base.layer_type = LAYER_SPIKING;
     layer->base.is_spiking = true;
     layer->base.forward = spiking_forward;
     layer->base.backward = spiking_backward;
-    layer->base.zero_grad = spiking_zero_grad;  // Assign function pointer
+    layer->base.zero_grad = spiking_zero_grad;
     layer->base.reset_spike_counts = spiking_reset_spike_counts;
-    layer->base.num_inputs= num_neurons;
-    layer->num_neurons = num_neurons;
-    layer->neurons = (ModelBase **)malloc(num_neurons * sizeof(ModelBase *));
-    layer->base.inputs = (float *)malloc(num_neurons * sizeof(float));
-    layer->base.output = (float *)malloc(num_neurons * sizeof(float));
-
+    layer->base.num_inputs = num_neurons;
     layer->base.output_size = num_neurons;
-
-    for (size_t i = 0; i < num_neurons; i++) {
-        layer->neurons[i] = neuron_models[i];
+    
+    // Initialize neuron layer with SoA
+    lif_initialize(&layer->neuron_layer, num_neurons, v_rest, threshold, v_reset, beta);
+    
+    // Allocate output arrays with aligned memory
+    layer->base.output = (float *)ALIGNED_ALLOC(64, num_neurons * sizeof(float));
+    layer->input_gradients = (float *)ALIGNED_ALLOC(64, num_neurons * sizeof(float));
+    layer->spike_gradients = (float *)ALIGNED_ALLOC(64, num_neurons * sizeof(float));
+    
+    if (!layer->base.output || !layer->input_gradients || !layer->spike_gradients) {
+        fprintf(stderr, "Memory allocation failed\n");
+        exit(1);
     }
-
-    layer->spike_gradients = (float *)malloc(num_neurons * sizeof(float));
-    layer->base.input_gradients = (float *)malloc(num_neurons * sizeof(float));
+    
+    // Initialize to zero
+    memset(layer->base.output, 0, num_neurons * sizeof(float));
+    memset(layer->input_gradients, 0, num_neurons * sizeof(float));
+    memset(layer->spike_gradients, 0, num_neurons * sizeof(float));
 }
 
 void spiking_forward(void *self, float *input, size_t input_size, size_t time_step) {
+    (void)time_step; // Mark unused parameter
     SpikingLayer *layer = (SpikingLayer *)self;
     
-    // Store input for this time step
-    memcpy(layer->base.inputs, input, input_size * sizeof(float));
-
-    for (size_t i = 0; i < layer->num_neurons; i++) {
-        layer->neurons[i]->update_neuron(layer->neurons[i], input[i]);
-
-        // Store output
-        layer->base.output[i] = layer->neurons[i]->spiked;
-        
-        // Store membrane potential and spikes for BPTT
-        // if (layer->membrane_history) {
-        //    layer->membrane_history[time_step * layer->num_neurons + i] = layer->neurons[i]->v;
-        //    layer->spike_history[time_step * layer->num_neurons + i] = layer->neurons[i]->spiked;
-        // }
+    // Update neurons
+    lif_update(&layer->neuron_layer, input, input_size);
+    
+    // Copy spikes to output
+    #ifdef _OPENMP
+    #pragma omp parallel for
+    #endif
+    for (size_t i = 0; i < (size_t)layer->base.output_size; i++) {
+        layer->base.output[i] = (float)layer->neuron_layer.spiked[i];
     }
 }
 
-// Backward pass for Spiking Layer
 float* spiking_backward(void *self, float *gradients, size_t time_step) {
+    (void)time_step; // Mark unused parameter
     SpikingLayer *layer = (SpikingLayer *)self;
-
-    for (size_t i = 0; i < layer->num_neurons; i++) {
-        LIFNeuron *neuron = (LIFNeuron *)layer->neurons[i];
-        
-        // Load membrane potential for this time step
-        // if (layer->membrane_history) {
-        //     neuron->base.v = layer->membrane_history[time_step * layer->num_neurons + i];
-        //     neuron->base.spiked = layer->spike_history[time_step * layer->num_neurons + i];
-        // }
-        
-        // ATAN surrogate gradient (matches snnTorch default)
-        float spike_derivative = 1.0f / (1.0f + neuron->base.v * neuron->base.v);
+    
+    #ifdef _OPENMP
+    #pragma omp parallel for
+    #endif
+    for (size_t i = 0; i < (size_t)layer->base.output_size; i++) {
+        // ATAN surrogate gradient
+        float spike_derivative = 1.0f / (1.0f + layer->neuron_layer.v[i] * layer->neuron_layer.v[i]);
         
         // Combine with incoming gradients
         layer->spike_gradients[i] = gradients[i] * spike_derivative;
         
         // Propagate gradient through membrane potential
-        layer->base.input_gradients[i] = layer->spike_gradients[i] * neuron->beta;
+        layer->input_gradients[i] = layer->spike_gradients[i] * layer->neuron_layer.beta[i];
     }
-
-    return layer->base.input_gradients;
+    
+    return layer->input_gradients;
 }
 
 void spiking_zero_grad(void *self) {
     SpikingLayer *layer = (SpikingLayer *)self;
-    
-    // Zero out spike gradients
-    if (layer->spike_gradients) {
-        memset(layer->spike_gradients, 0, layer->num_neurons * sizeof(float));
-    }
-    
-    // Zero out input gradients
-    if (layer->base.input_gradients) {
-        memset(layer->base.input_gradients, 0, layer->num_neurons * sizeof(float));
-    }
-    
-    // If you later add weight/bias gradients to SpikingLayer:
-    // if (layer->base.weight_gradients) {
-    //     memset(layer->base.weight_gradients, 0, 
-    //            layer->base.num_inputs * layer->base.num_outputs * sizeof(float));
-    // }
-    // if (layer->base.bias_gradients) {
-    //     memset(layer->base.bias_gradients, 0, layer->base.num_outputs * sizeof(float));
-    // }
+    memset(layer->spike_gradients, 0, layer->base.output_size * sizeof(float));
+    memset(layer->input_gradients, 0, layer->base.output_size * sizeof(float));
 }
 
 void spiking_reset_spike_counts(void *self) {
     SpikingLayer *layer = (SpikingLayer *)self;
-    for (size_t i = 0; i < layer->num_neurons; i++) {
-        LIFNeuron *neuron = (LIFNeuron *)layer->neurons[i];
-        neuron->base.v = 0;     // or 0 if v_rest is 0
-        neuron->spike_count = 0;
-        neuron->base.spiked = 0;
+    #ifdef _OPENMP
+    #pragma omp parallel for
+    #endif
+    for (size_t i = 0; i < (size_t)layer->base.output_size; i++) {
+        layer->neuron_layer.v[i] = layer->neuron_layer.v_rest[i];
+        layer->neuron_layer.spike_count[i] = 0;
+        layer->neuron_layer.spiked[i] = 0;
     }
 }
 
 void spiking_free(SpikingLayer *layer) {
-    free(layer->neurons);
-    free(layer->spike_gradients);
-    free(layer->base.input_gradients);
+    lif_free(&layer->neuron_layer);
+    ALIGNED_FREE(layer->base.output);
+    ALIGNED_FREE(layer->input_gradients);
+    ALIGNED_FREE(layer->spike_gradients);
 }

@@ -29,10 +29,11 @@ void update_weights(Network *network, float learning_rate);
 void train(Network *network, Dataset *dataset);
 float test(Network *network, Dataset *dataset);
 void zero_grads(Network* model);
-void compute_probabilities(float *spike_counts, size_t num_neurons, float *probabilities);
+void compute_probabilities(int *spike_counts, size_t num_neurons, float *probabilities);
 void sample_test(Network *network, const char* path);
+float single_inference(Network *network, Sample *sample);
 
-
+void optimize_network(Network* network);
 
 
 #endif // NETWORK_H

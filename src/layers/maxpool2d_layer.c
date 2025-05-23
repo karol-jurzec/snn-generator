@@ -30,7 +30,7 @@ void maxpool2d_initialize(MaxPool2DLayer *layer, int kernel_size, int stride, in
     layer->base.output_size = output_size;
 
     // Allocate memory
-    layer->base.inputs = (float *)malloc(input_size * sizeof(float));
+    //layer->base.inputs = (float *)malloc(input_size * sizeof(float));
     layer->base.output = (float *)malloc(output_size * sizeof(float));
     layer->max_indices = (size_t *)malloc(output_size * sizeof(size_t));
 
@@ -50,7 +50,7 @@ void maxpool2d_initialize(MaxPool2DLayer *layer, int kernel_size, int stride, in
 void maxpool2d_forward(void *self, float *input, size_t input_size, size_t time_step) {
     MaxPool2DLayer *layer = (MaxPool2DLayer *)self;
 
-    memcpy(layer->base.inputs, input, input_size * sizeof(float));
+    // memcpy(layer->base.inputs, input, input_size * sizeof(float));
 
     size_t C = layer->num_of_channels;
     size_t H = layer->input_dim;
@@ -86,11 +86,6 @@ void maxpool2d_forward(void *self, float *input, size_t input_size, size_t time_
         }
     }
 
-    // if (layer->max_indices_history) {
-    //     memcpy(&layer->max_indices_history[time_step * layer->base.output_size],
-    //            layer->max_indices,
-    //            layer->base.output_size * sizeof(size_t));
-    // }
 }
 
 float* maxpool2d_backward(void *self, float *gradients, size_t time_step) {

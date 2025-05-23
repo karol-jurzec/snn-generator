@@ -8,20 +8,20 @@ void flatten_initialize(FlattenLayer *layer, size_t input_size) {
     layer->base.layer_type = LAYER_FLATTEN;
     layer->base.num_inputs = input_size;
     layer->base.is_spiking = false;
-    layer->base.inputs = (float*)malloc(input_size * sizeof(float));
+    //layer->base.inputs = (float*)malloc(input_size * sizeof(float));
     layer->base.forward = flatten_forward;
     layer->base.backward = flatten_backward;
     layer->base.zero_grad = flatten_zero_grad;  // Assign function pointer
     layer->base.output_size = input_size;  // Output size matches input size (flattening does not change total number of elements)
     layer->base.output = (float *)malloc(layer->base.output_size * sizeof(float));
-    layer->base.input_gradients = (float *)malloc(input_size * sizeof(float));
+    //layer->base.input_gradients = (float *)malloc(input_size * sizeof(float));
 
 }
 
 void flatten_forward(void *self, float *input, size_t input_size, size_t time_step) {
     FlattenLayer *layer = (FlattenLayer *)self;
 
-    memcpy(layer->base.inputs, input, input_size * sizeof(float));
+    // memcpy(layer->base.inputs, input, input_size * sizeof(float));
 
     // Copy input directly to output (flattening effect)
     for (size_t i = 0; i < input_size; i++) {

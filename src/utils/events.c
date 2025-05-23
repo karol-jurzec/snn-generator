@@ -242,6 +242,16 @@ void free_frames(int16_t ****frames, int num_bins, int height) {
     free(frames);
 }
 
+void zero_time_bin(int16_t ****frames, int bin_to_zero, int width, int height) {
+    for (int c = 0; c < 2; c++) {
+        for (int y = 0; y < height; y++) {
+            for (int x = 0; x < width; x++) {
+                frames[bin_to_zero][c][y][x] = 0;
+            }
+        }
+    }
+}
+
 float *flatten_frames_to_float(int16_t ****frames, int bins, int height, int width) {
     if (!frames || bins <= 0 || height <= 0 || width <= 0) return NULL;
 
@@ -251,6 +261,8 @@ float *flatten_frames_to_float(int16_t ****frames, int bins, int height, int wid
         fprintf(stderr, "Error: Memory allocation failed in flatten_frames_to_float\n");
         return NULL;
     }
+
+    //zero_time_bin(frames, 25, height, width);
 
     for (int b = 0; b < bins; b++) {
         for (int c = 0; c < 2; c++) {

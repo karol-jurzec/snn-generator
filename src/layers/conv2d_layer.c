@@ -41,13 +41,13 @@ void conv2d_initialize(Conv2DLayer *layer, int in_channels, int out_channels, in
     layer->biases = (float *)malloc(out_channels * sizeof(float));
 
     // weights and bias initalization
-    he_kaiming_uniform_init(layer->base.weights, weight_size, in_channels, kernel_size);
-    initialize_biases(layer->biases, out_channels, in_channels * kernel_size * kernel_size);
+    // he_kaiming_uniform_init(layer->base.weights, weight_size, in_channels, kernel_size);
+    //initialize_biases(layer->biases, out_channels, in_channels * kernel_size * kernel_size);
 
-    layer->base.weight_gradients = (float *)malloc(weight_size * sizeof(float));
-    layer->base.bias_gradients = (float *)malloc(out_channels * sizeof(float));
-    layer->base.input_gradients = (float *)malloc(input_dim * input_dim * layer->in_channels * sizeof(float));
-    layer->base.inputs = (float *)malloc(input_dim * input_dim * layer->in_channels  * sizeof(float));
+    //layer->base.weight_gradients = (float *)malloc(weight_size * sizeof(float));
+    //layer->base.bias_gradients = (float *)malloc(out_channels * sizeof(float));
+    //layer->base.input_gradients = (float *)malloc(input_dim * input_dim * layer->in_channels * sizeof(float));
+    //layer->base.inputs = (float *)malloc(input_dim * input_dim * layer->in_channels  * sizeof(float));
 }
 
 void conv2d_forward(void *self, float *input, size_t input_size, size_t time_step) {
@@ -56,7 +56,7 @@ void conv2d_forward(void *self, float *input, size_t input_size, size_t time_ste
     int kernel_dim = layer->in_channels * layer->kernel_size * layer->kernel_size;
     int num_outputs = output_dim * output_dim;
 
-    memcpy(layer->base.inputs, input, input_size * sizeof(float));
+    // memcpy(layer->base.inputs, input, input_size * sizeof(float));
 
     // im2col: convert input into column matrix
     float* col = (float *)malloc(kernel_dim * num_outputs * sizeof(float));
