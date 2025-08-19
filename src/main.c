@@ -8,6 +8,7 @@
 #include "../include/tests.h"
 #include "../include/models/lif_neuron.h"
 #include "../include/models/izhikevich_neuron.h"
+#include "../include/utils/perf.h"
 
 static double now_seconds(void) {
     struct timeval tv;
@@ -16,69 +17,30 @@ static double now_seconds(void) {
 }
 
 int main(int argc, char *argv[]) {
+	
+	//nmnist_loader_test();
+	srand(42);
 
-    /* 
-    float **array = (float **)malloc(4 * sizeof(float *));
-    for (int i = 0; i < 4; i++) {
-        array[i] = (float *)malloc(4 * sizeof(float));
-    }
+	int perf_mode = 0;
+	for (int i = 1; i < argc; i++) {
+		if (strcmp(argv[i], "--perf") == 0) perf_mode = 1;
+	}
+	if (perf_mode) perf_enable(1);
 
-    array[0][0] = 0.2; array[0][1] = 0.5; array[0][2] = 0.7; array[0][3] = 0.1;
-    array[1][0] = 0.6; array[1][1] = 0.3; array[1][2] = 0.9; array[1][3] = 0.4;
-    array[2][0] = 0.8; array[2][1] = 0.2; array[2][2] = 0.5; array[2][3] = 0.7;
-    array[3][0] = 0.3; array[3][1] = 0.6; array[3][2] = 0.8; array[3][3] = 0.2;
- 
+	double t0 = now_seconds();
 
-    SNN network;
-    initialize_snn(&network); 
-    update_snn(&network,  array, 4);
+	//loader_test();
+	nmnist_test();
+	//stmnist_test();
 
-    get_snn_spike_counts(&network);
+	double t1 = now_seconds();
+	printf("train_test() took %.6f seconds\n", t1 - t0);
 
-    LIFNeuron* leaky = malloc(sizeof(LIFNeuron));
+	if (perf_mode) perf_report();
 
-    initialize_neuron(leaky, 0.0, 1.0, 0.0, 0.8);
-    single_lf_test(&(leaky->model_base));
-    free(leaky); // Free allocated memory
-    */ 
-   
-   /*
-    LIFNeuron lif;
-    lif_initialize(&lif, 0.0f, 1.0f, 0.0f, 0.8f);
-    single_neuron_test((ModelBase *)&lif, "out/single_neuron_leaky.png");
+	//iris_classification_example();
+	//hor_vert_dataset();
 
-    IzhikevichNeuron izh;
-    izhikevich_initialize(&izh, 0.1f, 0.1f, 0.1f, 0.1f, 0.0f);
-    single_neuron_test((ModelBase *)&izh, "out/single_neuron_izh.png");
-
-    conv2d_test();
-    maxpool2d_test();
-    flatten_test();
-    linear_test();
-    spiking_layer_test();
-    network_test();
-    network_loader_test();
-    nmnist_loader_test();
-   */
-
-//nmnist_loader_test();
-    srand(42);
-
-    double t0 = now_seconds();
-
-    
-    //loader_test();
-    nmnist_test();
-    stmnist_test();
-
-    double t1 = now_seconds();
-    printf("train_test() took %.6f seconds\n", t1 - t0);
-
-    
-    //iris_classification_example();
-    //hor_vert_dataset();
-
-    return 0;
+	return 0;
 }
-
 

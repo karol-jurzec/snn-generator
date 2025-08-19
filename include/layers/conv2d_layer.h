@@ -21,6 +21,9 @@ typedef struct {
     float *bias_gradients;   // Gradient of biases
     float *input_gradients;  // Gradient of input to propagate backward
 
+    bool* deactive_out_channels;
+    bool* active_in_channels;
+
     float *input;
 } Conv2DLayer;
 

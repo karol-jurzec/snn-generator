@@ -38,6 +38,33 @@ for (c = 0; c < channels; ++c) {
     }
 }
 
+void im2col_pruned(float* input, int in_channels, int input_dim,
+    int kernel_size, int padding, int stride,
+    float* col, int output_h, int output_w,
+    const bool* active_channels) {
+    int col_index = 0;
+    for (int ic = 0; ic < in_channels; ic++) {
+        if (!active_channels[ic]) continue;
+            for (int ky = 0; ky < kernel_size; ky++) {
+                for (int kx = 0; kx < kernel_size; kx++) {
+                    for (int oy = 0; oy < output_h; oy++) {
+                        for (int ox = 0; ox < output_w; ox++) {
+                            int ix = ox * stride + kx - padding;
+                            int iy = oy * stride + ky - padding;
+                            int col_offset = col_index * output_h * output_w + oy * output_w + ox;
+                            if (ix >= 0 && iy >= 0 && ix < input_dim && iy < input_dim) {
+                                col[col_offset] = input[ic * input_dim * input_dim + iy * input_dim + ix];
+                            } else {
+                                col[col_offset] = 0.0f;
+                            }
+                        }
+                    }
+                col_index++;
+            }
+        }
+    }
+}
+
 void col2im(const float *data_col,
     int channels, int height, int width,
     int kernel_size, int padding, int stride,

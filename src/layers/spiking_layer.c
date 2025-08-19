@@ -16,6 +16,7 @@ void spiking_initialize(SpikingLayer *layer, size_t num_neurons, ModelBase **neu
     layer->neurons = (ModelBase **)malloc(num_neurons * sizeof(ModelBase *));
     layer->base.inputs = (float *)malloc(num_neurons * sizeof(float));
     layer->base.output = (float *)malloc(num_neurons * sizeof(float));
+    layer->total_spikes = (int *)calloc(num_neurons,  sizeof(int));
 
     layer->base.output_size = num_neurons;
 
@@ -38,6 +39,7 @@ void spiking_forward(void *self, float *input, size_t input_size, size_t time_st
 
         // Store output
         layer->base.output[i] = layer->neurons[i]->spiked;
+        layer->total_spikes[i] += layer->base.output[i];
         
         // Store membrane potential and spikes for BPTT
         // if (layer->membrane_history) {

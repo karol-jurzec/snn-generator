@@ -31,7 +31,7 @@ float test(Network *network, Dataset *dataset);
 void zero_grads(Network* model);
 void compute_probabilities(float *spike_counts, size_t num_neurons, float *probabilities);
 void sample_test(Network *network, const char* path);
-
+void optimize_network(Network* network);
 
 
 

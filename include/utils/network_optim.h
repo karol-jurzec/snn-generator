@@ -1,6 +1,9 @@
 #include "../layers/spiking_layer.h"
 #include "../layers/conv2d_layer.h"
 #include "layer_utils.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 // Struktura do przechowywania informacji o aktywności neuronów
 typedef struct {

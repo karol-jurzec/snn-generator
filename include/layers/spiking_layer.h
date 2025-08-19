@@ -20,6 +20,7 @@ typedef struct {
 
     float *membrane_history;  // [time_steps][num_neurons]
     int *spike_history;       // [time_steps][num_neurons]
+    int *total_spikes; 
 } SpikingLayer;
 
 void spiking_initialize(SpikingLayer *layer, size_t num_neurons, ModelBase **neuron_models);
