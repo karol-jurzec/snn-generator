@@ -3,6 +3,12 @@
 #include <string.h>
 #include <math.h>
 
+#ifdef _WIN32
+#include <malloc.h>  // dla _aligned_malloc i _aligned_free
+#else
+#include <stdlib.h>  // dla aligned_alloc
+#endif
+
 #include "../../include/utils/layer_utils.h" 
 #include "../../include/layers/conv2d_layer.h"
 
@@ -35,6 +41,8 @@ void conv2d_initialize(Conv2DLayer *layer, int in_channels, int out_channels, in
     layer->stride = stride;
     layer->padding = padding;
 
+    layer->deactive_out_channels = (bool*)calloc(out_channels, sizeof(bool));
+
     size_t weight_size = in_channels * out_channels * kernel_size * kernel_size;
     layer->base.weights = (float *)malloc(weight_size * sizeof(float));
     layer->base.num_weights = weight_size;
@@ -51,40 +59,43 @@ void conv2d_initialize(Conv2DLayer *layer, int in_channels, int out_channels, in
 }
 
 void conv2d_forward(void *self, float *input, size_t input_size, size_t time_step) {
-    Conv2DLayer *layer = (Conv2DLayer *)self;
-    int output_dim = calculate_output_dim(layer->input_dim, layer->kernel_size, layer->stride, layer->padding);
-    int kernel_dim = layer->in_channels * layer->kernel_size * layer->kernel_size;
-    int num_outputs = output_dim * output_dim;
+    Conv2DLayer *L = (Conv2DLayer *)self;
+    int H  = L->input_dim;
+    int K  = L->kernel_size;
+    int P  = L->padding;
+    int S  = L->stride;
+    int IC = L->in_channels;
+    int OC = L->out_channels;
 
-    memcpy(layer->base.inputs, input, input_size * sizeof(float));
+    int OUT_H = calculate_output_dim(H, K, S, P);
+    int OUT_W = OUT_H;
+    int N     = OUT_H * OUT_W;
 
-    // im2col: convert input into column matrix
-    float* col = (float *)malloc(kernel_dim * num_outputs * sizeof(float));
-    im2col(input, layer->in_channels, layer->input_dim, layer->input_dim,
-           layer->kernel_size, layer->padding, layer->stride,
-           col, output_dim, output_dim);
+    memcpy(L->base.inputs, input, input_size * sizeof(float));
 
-    // GEMM: output = W * col
-    // W: [out_channels x kernel_dim], col: [kernel_dim x num_outputs] => output: [out_channels x num_outputs]
-    cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
-                layer->out_channels, num_outputs, kernel_dim,
-                1.0f,
-                layer->base.weights, kernel_dim,
-                col, num_outputs,
-                0.0f,
-                layer->base.output, num_outputs);
+    for (int oc = 0; oc < OC; ++oc) {
+        for (int oy = 0; oy < OUT_H; ++oy) {
+            for (int ox = 0; ox < OUT_W; ++ox) {
+                float acc = L->biases[oc];
+                for (int ic = 0; ic < IC; ++ic) {
+                    for (int ky = 0; ky < K; ++ky) {
+                        int iy = oy * S + ky - P;
+                        if (iy < 0 || iy >= H) continue;
+                        for (int kx = 0; kx < K; ++kx) {
+                            int ix = ox * S + kx - P;
+                            if (ix < 0 || ix >= H) continue;
 
-    // Add biases
-    for (int oc = 0; oc < layer->out_channels; ++oc) {
-        for (int i = 0; i < num_outputs; ++i) {
-            layer->base.output[oc * num_outputs + i] += layer->biases[oc];
+                            int widx = oc * (IC*K*K) + ic * (K*K) + ky * K + kx;
+                            int iidx = ic * (H*H) + iy * H + ix;
+                            acc += L->base.weights[widx] * input[iidx];
+                        }
+                    }
+                }
+                L->base.output[oc * N + oy * OUT_W + ox] = acc;
+            }
         }
     }
-
-    free(col);
 }
-
-
 
 float* conv2d_backward(void *self, float *gradients, size_t time_step) {
     Conv2DLayer *L = (Conv2DLayer*)self;
@@ -97,50 +108,67 @@ float* conv2d_backward(void *self, float *gradients, size_t time_step) {
 
     int OUT_H = calculate_output_dim(H, K, S, P);
     int OUT_W = OUT_H;
-    int N     = OUT_H * OUT_W;         // num outputs per channel
-    int KD    = IC * K * K;            // flattened kernel dim
+    int N     = OUT_H * OUT_W;
 
-    // 1) unfold input and gradients into matrices
-    float *X_col = malloc(sizeof(float) * KD * N);
-    im2col(L->base.inputs, IC, H, H, K, P, S, X_col, OUT_H, OUT_W);
-
-    float *dY = gradients;             // already shaped [OC * OUT_H * OUT_W]
-    // we can treat dY as [OC x N] in row-major
-
-    // 2) compute weight gradients: dW = dY * X_col^T
-    // L->base.weight_gradients is [OC x KD]
-    cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasTrans,
-                OC, KD, N,
-                1.0f,
-                dY,   N,        // A: [OC x N]
-                X_col, N,       // B: [KD x N] (we transpose B)
-                1.0f,           // accumulate
-                L->base.weight_gradients, KD);
-
-    // 3) accumulate bias gradients: sum each row of dY
-    for(int oc=0; oc<OC; ++oc){
-      float acc = 0.0f;
-      float *row = dY + oc*N;
-      for(int i=0; i<N; ++i) acc += row[i];
-      L->base.bias_gradients[oc] += acc;
+    // db += sum(dY)
+    for (int oc = 0; oc < OC; ++oc) {
+        float accb = 0.0f;
+        for (int oy = 0; oy < OUT_H; ++oy) {
+            for (int ox = 0; ox < OUT_W; ++ox) {
+                accb += gradients[oc * N + oy * OUT_W + ox];
+            }
+        }
+        L->base.bias_gradients[oc] += accb;
     }
 
-    // 4) compute input‑gradients in column form: dX_col = W^T * dY
-    float *dX_col = malloc(sizeof(float) * KD * N);
-    cblas_sgemm(CblasRowMajor, CblasTrans, CblasNoTrans,
-                KD, N, OC,
-                1.0f,
-                L->base.weights, KD,  // W: [OC x KD]
-                dY,               N,  // dY: [OC x N]
-                0.0f,
-                dX_col,           N); // dX_col: [KD x N]
+    // dW += dY * X (konwolucyjne)
+    for (int oc = 0; oc < OC; ++oc) {
+        for (int ic = 0; ic < IC; ++ic) {
+            for (int ky = 0; ky < K; ++ky) {
+                for (int kx = 0; kx < K; ++kx) {
+                    float acc = 0.0f;
+                    for (int oy = 0; oy < OUT_H; ++oy) {
+                        int iy = oy * S + ky - P;
+                        if (iy < 0 || iy >= H) continue;
+                        for (int ox = 0; ox < OUT_W; ++ox) {
+                            int ix = ox * S + kx - P;
+                            if (ix < 0 || ix >= H) continue;
+                            float dy = gradients[oc * N + oy * OUT_W + ox];
+                            float x  = L->base.inputs[ic * (H*H) + iy * H + ix];
+                            acc += dy * x;
+                        }
+                    }
+                    int widx = oc * (IC*K*K) + ic * (K*K) + ky * K + kx;
+                    L->base.weight_gradients[widx] += acc;
+                }
+            }
+        }
+    }
 
-    // 5) fold columns back to spatial gradients
-    col2im(dX_col, IC, H, H, K, P, S,
-           L->base.input_gradients, OUT_H, OUT_W);
+    // dX = sum over oc,ky,kx of W * dY (transposed conv)
+    // Wyzeruj bufor
+    memset(L->base.input_gradients, 0, sizeof(float) * (H*H*IC));
 
-    free(X_col);
-    free(dX_col);
+    for (int oc = 0; oc < OC; ++oc) {
+        for (int oy = 0; oy < OUT_H; ++oy) {
+            for (int ox = 0; ox < OUT_W; ++ox) {
+                float dy = gradients[oc * N + oy * OUT_W + ox];
+                for (int ic = 0; ic < IC; ++ic) {
+                    for (int ky = 0; ky < K; ++ky) {
+                        int iy = oy * S + ky - P;
+                        if (iy < 0 || iy >= H) continue;
+                        for (int kx = 0; kx < K; ++kx) {
+                            int ix = ox * S + kx - P;
+                            if (ix < 0 || ix >= H) continue;
+                            int widx = oc * (IC*K*K) + ic * (K*K) + ky * K + kx;
+                            int iidx = ic * (H*H) + iy * H + ix;
+                            L->base.input_gradients[iidx] += L->base.weights[widx] * dy;
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     return L->base.input_gradients;
 }

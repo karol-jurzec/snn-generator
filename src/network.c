@@ -2,10 +2,12 @@
 #include <stdio.h>
 #include <ctype.h>
 #include <math.h>
+#include <time.h>  // Dodaj na początku pliku
 #include <string.h>
 
 #include "../include/network.h"
 #include "utils/network_logger.h"
+#include "utils/network_optim.h"
 
 #define LEARNING_RATE 0.001
 //#define EPOCHS 10
@@ -445,6 +447,8 @@ float test(Network *network, Dataset *dataset) {
     size_t correct_predictions = 0;
     size_t total_samples = dataset->num_samples;
 
+    clock_t start_time = clock();  // rozpocznij pomiar
+
     for (size_t i = 0; i < total_samples; i++) {
         Sample *sample = &dataset->samples[i];
 
@@ -466,10 +470,6 @@ float test(Network *network, Dataset *dataset) {
                 network->layers[j]->forward(network->layers[j], network->layers[j - 1]->output,
                                             network->layers[j - 1]->output_size, 0);
             }
-            //if(i % 100000 == 0) {
-                //log_inputs(network, 0, i, t);
-            //    log_spikes(network, 0, i, t, sample->label);
-            //}
         }
 
         SpikingLayer *output_layer = (SpikingLayer *)network->layers[network->num_layers - 1];
@@ -477,7 +477,6 @@ float test(Network *network, Dataset *dataset) {
         for (size_t n = 0; n < output_layer->num_neurons; n++) {
             LIFNeuron *neuron = (LIFNeuron *)output_layer->neurons[n];
             spike_counts[n] = (float)neuron->spike_count;
-            
         }
 
         float probabilities[output_layer->num_neurons];
@@ -499,11 +498,21 @@ float test(Network *network, Dataset *dataset) {
         free(input);
     }
 
-    log_weights(network, 0, 0);
+    clock_t end_time = clock();  // zakończ pomiar
+
+    double elapsed_time = (double)(end_time - start_time) / CLOCKS_PER_SEC;
+    double avg_time_per_sample = elapsed_time / total_samples;
 
     float accuracy = (float)correct_predictions / total_samples * 100.0f;
     printf("Validation Accuracy: %.2f%%\n", accuracy);
+    printf("Average Inference Time per Sample: %.6f seconds\n", avg_time_per_sample);
+
     return accuracy;
+}
+
+void optimize_network(Network* network) {
+    (void)network;
+    // Baseline (no-op): optymalizacje wyłączone
 }
 
 

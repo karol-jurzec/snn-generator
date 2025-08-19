@@ -45,70 +45,43 @@ void linear_initialize(LinearLayer *layer, size_t in_features, size_t out_featur
 
 void linear_forward(void *self, float *input, size_t input_size, size_t time_step) {
     LinearLayer *L = (LinearLayer*)self;
-    // Save the raw input for backward
     memcpy(L->base.inputs, input, input_size * sizeof(float));
 
-    // y = W * x + b
-    // W: [out_features x in_features], x: [in_features]
-    cblas_sgemv(
-      CblasRowMajor,
-      CblasNoTrans,
-      L->out_features, L->in_features,
-      1.0f,
-      L->base.weights,        // A
-      L->in_features,         // lda
-      input,                  // x
-      1,                      // incx
-      0.0f,
-      L->base.output,         // y
-      1                       // incy
-    );
-
-    // add biases
     for (size_t o = 0; o < L->out_features; o++) {
-        L->base.output[o] += L->biases[o];
+        float acc = L->biases[o];
+        size_t row_offset = o * L->in_features;
+        for (size_t i = 0; i < L->in_features; i++) {
+            acc += L->base.weights[row_offset + i] * input[i];
+        }
+        L->base.output[o] = acc;
     }
 }
 
 float* linear_backward(void *self, float *gradients, size_t time_step) {
     LinearLayer *L = (LinearLayer*)self;
 
-    // 1) Weight gradients: ΔW += dY * x^T
-    // dY: [out_features], x: [in_features]
-    cblas_sger(
-      CblasRowMajor,
-      L->out_features,        // m
-      L->in_features,         // n
-      1.0f,
-      gradients,              // x (m-vector)
-      1,                      // incx
-      L->base.inputs,         // y (n-vector)
-      1,                      // incy
-      L->base.weight_gradients, // A (m x n)
-      L->in_features          // lda
-    );
+    // dW += dY * x^T
+    for (size_t o = 0; o < L->out_features; o++) {
+        size_t row_offset = o * L->in_features;
+        float g = gradients[o];
+        for (size_t i = 0; i < L->in_features; i++) {
+            L->base.weight_gradients[row_offset + i] += g * L->base.inputs[i];
+        }
+    }
 
-    // 2) Bias gradients: Δb += dY
+    // db += dY
     for (size_t o = 0; o < L->out_features; o++) {
         L->base.bias_gradients[o] += gradients[o];
     }
 
-    // 3) Input gradients: dX = W^T * dY
-    // Note: W^T: [in_features x out_features], dY: [out_features]
-    cblas_sgemv(
-      CblasRowMajor,
-      CblasTrans,
-      L->out_features,        // rows of original W
-      L->in_features,         // cols of original W
-      1.0f,
-      L->base.weights,        // A
-      L->in_features,         // lda
-      gradients,              // x
-      1,                      // incx
-      0.0f,
-      L->base.input_gradients,// y
-      1                       // incy
-    );
+    // dX = W^T * dY
+    for (size_t i = 0; i < L->in_features; i++) {
+        float acc = 0.0f;
+        for (size_t o = 0; o < L->out_features; o++) {
+            acc += L->base.weights[o * L->in_features + i] * gradients[o];
+        }
+        L->base.input_gradients[i] = acc;
+    }
 
     return L->base.input_gradients;
 }
@@ -142,6 +115,6 @@ void linear_free(LinearLayer *layer) {
     free(layer->base.weight_gradients);
     free(layer->base.bias_gradients);
     free(layer->base.input_gradients);
-    free(layer->output);
+    free(layer->base.output);
 }
 
