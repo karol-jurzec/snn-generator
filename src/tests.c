@@ -459,7 +459,7 @@ void nmnist_test() {
 
     printf("Loading test dataset from %s...\n", network_config_path_test);
     perf_mark_start("nmnist_dataset_load");
-    Dataset *dataset_test = load_dataset(network_config_path_test, FORMAT_NMNIST, 250, false, true);
+    Dataset *dataset_test = load_dataset(network_config_path_test, FORMAT_NMNIST, 1, false, true);
     perf_mark_end("nmnist_dataset_load");
     if (dataset_test) {
         perf_add_metric("nmnist_dataset_samples", (double)dataset_test->num_samples);

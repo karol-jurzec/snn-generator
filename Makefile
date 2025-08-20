@@ -34,6 +34,8 @@ TARGET = snn_generator
 
 # Default Target
 all: $(TARGET)
+release: CFLAGS += -O2 -DNDEBUG
+release: all
 
 # Build Target
 $(TARGET): $(OBJ_FILES)
