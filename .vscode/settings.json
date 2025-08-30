@@ -29,7 +29,10 @@
         "network.h": "c",
         "snn_plot.h": "c",
         "network_optim.h": "c",
-        "layer_base.h": "c"
+        "layer_base.h": "c",
+        "channel_pruning.h": "c",
+        "perf.h": "c",
+        "time.h": "c"
     },
 "C_Cpp.errorSquiggles": "disabled"
 }

@@ -18,7 +18,9 @@ Dataset *load_stmnist_dataset(const char *dir, size_t max_samples, bool stabiliz
 
     // Organize file paths by class
     const int num_classes = STMNIST_CLASSES;
-    size_t per_class_max = (max_samples > 0) ? max_samples / num_classes : SIZE_MAX;
+    size_t per_class_max = (max_samples > 0) ? 
+        (max_samples + num_classes - 1) / num_classes :  // Round UP division
+        SIZE_MAX;
 
     size_t class_counts[STMNIST_CLASSES] = {0};
     size_t class_capacities[STMNIST_CLASSES] = {0};

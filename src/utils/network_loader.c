@@ -63,8 +63,12 @@ void parse_and_add_layer(Network *network, struct json_object *layer_config, siz
         add_layer(network, (LayerBase *)pool_layer, index);
 
         // Update shape: Spatial dims change due to pooling
-        current_height = (current_height - kernel_size) / kernel_size + 1;
-        current_width = (current_width - kernel_size) / kernel_size + 1;
+        //current_height = (current_height - kernel_size) / kernel_size + 1;
+        //current_width = (current_width - kernel_size) / kernel_size + 1;
+
+        // Poprawna formuła dla MaxPool2d:
+        current_height = current_height / kernel_size;  
+        current_width = current_width / kernel_size;
 
     } else if (strcmp(type, "Flatten") == 0) {
         FlattenLayer *flatten_layer = (FlattenLayer *)malloc(sizeof(FlattenLayer));

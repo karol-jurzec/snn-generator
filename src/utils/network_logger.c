@@ -26,26 +26,6 @@ void log_weights(Network *network, int epoch, int batch) {
     fclose(file);
 }
 
-void log_gradients(Network *network, int epoch, int sample) {
-    char filename[100];
-    snprintf(filename, sizeof(filename), "out/weight_grads/gradients_epoch_%d_sample_%d.txt", epoch, sample);
-
-    FILE *file = fopen(filename, "w");
-    if (!file) return;
-
-    fprintf(file, "Epoch %d\n", epoch);
-    for (size_t l = 0; l < network->num_layers; l++) {
-        LayerBase *layer = network->layers[l];
-        if (layer->weight_gradients && layer->num_weights > 0) {
-            fprintf(file, "Layer %zu\n", l);
-            for (size_t w = 0; w < layer->num_weights; w++) {
-                fprintf(file, "%f\n", layer->weight_gradients[w]);
-            }
-        }
-    }
-    fclose(file);
-}
-
 const char* get_layer_type_name(LayerType type) {
     switch (type) {
         case LAYER_CONV2D: return "Conv2D";

@@ -24,19 +24,11 @@ typedef enum {
 // Base structure for layers
 typedef struct {
     LAYER_FORWARD_FUNC(forward);  // Forward function pointer for layers
-    LAYER_BACKWARD_FUNC(backward);  // Backward function pointer for layers
     UPDATE_WEIGHTS_FUNC(update_weights);  // Update weights function pointer for layers
     RESET_SPIKE_COUNTS_FUNC(reset_spike_counts);  // Reset spike counts function pointer for spiking layers
-    ZERO_GRAD_FUNC(zero_grad);  // Zero gradients function pointer for layers
 
     float *output;           // Output buffer for layers
-    float* output_history;  // Array of outputs for all time steps
-    float* grad_history;    // Array of gradients for all time steps
     size_t time_steps;      // Number of time steps (TIME_BINS)
-
-    float *input_gradients;       // Input gradients for backpropagation
-    float *weight_gradients; // Gradient of weights
-    float *bias_gradients;   // Gradient of biases
 
     float *weights;
     float *inputs;

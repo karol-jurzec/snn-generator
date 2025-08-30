@@ -32,19 +32,10 @@ void maxpool2d_initialize(MaxPool2DLayer *layer, int kernel_size, int stride, in
     // Allocate memory
     layer->base.inputs = (float *)malloc(input_size * sizeof(float));
     layer->base.output = (float *)malloc(output_size * sizeof(float));
-    layer->max_indices = (size_t *)malloc(output_size * sizeof(size_t));
-
-    // Optional: NULL for now
-    layer->base.input_gradients = NULL;
 
     // Function pointers
     layer->base.forward = maxpool2d_forward;
-    layer->base.backward = maxpool2d_backward;
-    layer->base.zero_grad = maxpool2d_zero_grad;  // Assign function pointer
-
-    layer->base.update_weights = NULL;
 }
-
 
 
 void maxpool2d_forward(void *self, float *input, size_t input_size, size_t time_step) {
@@ -81,63 +72,11 @@ void maxpool2d_forward(void *self, float *input, size_t input_size, size_t time_
 
                 size_t output_idx = c * output_H * output_W + oh * output_W + ow;
                 layer->base.output[output_idx] = max_val;
-                layer->max_indices[output_idx] = max_idx;
             }
         }
     }
-
-    // if (layer->max_indices_history) {
-    //     memcpy(&layer->max_indices_history[time_step * layer->base.output_size],
-    //            layer->max_indices,
-    //            layer->base.output_size * sizeof(size_t));
-    // }
 }
-
-float* maxpool2d_backward(void *self, float *gradients, size_t time_step) {
-    MaxPool2DLayer *layer = (MaxPool2DLayer *)self;
-    size_t C = layer->num_of_channels;
-    size_t H = layer->input_dim;
-    size_t W = layer->input_dim;
-    size_t input_size = C * H * W;
-
-    float *new_gradients = (float *)calloc(input_size, sizeof(float));
-    if (!new_gradients) {
-        fprintf(stderr, "Error: Memory allocation failed during backward pass.\n");
-        return NULL;
-    }
-
-    // Load max_indices for this time step
-    size_t *max_indices = layer->max_indices;
-    // if (layer->max_indices_history) {
-    //     max_indices = &layer->max_indices_history[time_step * layer->base.output_size];
-    // }
-
-    // Route gradients using max_indices
-    for (size_t i = 0; i < layer->base.output_size; i++) {
-        size_t max_idx = max_indices[i];
-        if (max_idx < input_size) {
-            new_gradients[max_idx] += gradients[i];
-        }
-    }
-
-    
-    layer->base.input_gradients = new_gradients;
-
-    return layer->base.input_gradients;
-}
-
-void maxpool2d_zero_grad(void *self) {
-    MaxPool2DLayer *layer = (MaxPool2DLayer *)self;
-    
-    // Zero out input gradients if they exist
-    if (layer->base.input_gradients) {
-        memset(layer->base.input_gradients, 0, layer->input_size * sizeof(float));
-    }
-}
-
 
 void maxpool2d_free(MaxPool2DLayer *layer) {
     free(layer->base.output);
-    free(layer->max_indices);
-    free(layer->base.input_gradients);
 }
