@@ -94,9 +94,9 @@ make release
 ```
 
 ### Clean build artifacts:
-
+```
 make clean
-
+```
 ### Usage
 Basic Execution
 
@@ -104,3 +104,10 @@ Sample run:
 ```
 ./snn_generator snn_nmnist_architecture.json snn_nmnist_weights_bs_32.json input/nmnist/1.bin
 ```
+### Optimization Strategies
+- **Channel Pruning**: Removes less active channels in convolutional layers
+- **Bidirectional Pruning**: Combines forward and backward pruning strategies
+
+### References
+- SNNTorch: Spiking Neural Networks in PyTorch
+- PyTorch: Deep learning framework
