@@ -103,6 +103,8 @@ Sample run:
 ```
 ./snn_generator snn_nmnist_architecture.json snn_nmnist_weights_bs_32.json input/nmnist/1.bin
 ```
+*Note: In a real-world embedded implementation, the input data typically comes from a live event-based sensor. In this case, for demonstration purposes, a static .bin or .mat file with raw events is used.
+
 ### Optimization Strategies
 - **Channel Pruning**: Removes less active channels in convolutional layers
 - **Bidirectional Pruning**: Combines forward and backward pruning strategies
