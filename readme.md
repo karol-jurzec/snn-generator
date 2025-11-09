@@ -83,3 +83,24 @@ sudo apt-get install gcc libjson-c-dev libmatio-dev build-essential
 ```
 brew install json-c matio
 ```
+
+### Building
+
+Clone the repository and build:
+```
+git clone <repository-url>
+cd snn-generator
+make release
+```
+
+### Clean build artifacts:
+
+make clean
+
+### Usage
+Basic Execution
+
+Sample run:
+```
+./snn_generator snn_nmnist_architecture.json snn_nmnist_weights_bs_32.json input/nmnist/1.bin
+```

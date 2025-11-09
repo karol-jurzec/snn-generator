@@ -7,13 +7,12 @@
 #include "../include/utils/dataset_loader.h"
 
 void print_usage(const char *program_name) {
-    printf("Usage: %s <architecture.json> <weights.json> <sample_file> [label] [options]\n", program_name);
+    printf("Usage: %s <architecture.json> <weights.json> <sample_file> [options]\n", program_name);
     printf("\n");
     printf("Arguments:\n");
     printf("  architecture.json    Path to architecture JSON file\n");
     printf("  weights.json        Path to weights JSON file\n");
     printf("  sample_file         Path to sample file (.bin for NMNIST, .mat for STMNIST)\n");
-    printf("  label               Label (0-9) - optional, will be used for verification\n");
     printf("\n");
     printf("Options:\n");
     printf("  -W, --width WIDTH      Input width (default: auto-detect from format)\n");
