@@ -53,11 +53,11 @@ void stabilize_nmnist_events(SpikeEvent *events, size_t num_events) {
             events[i].x -= (7.0f - (7.0f * (ts - 210000) / 105000));
         }
 
-        // Clamp coordinates
+        // clamp coordinates
         if (events[i].x < 1) events[i].x = 1;
         if (events[i].y < 1) events[i].y = 1;
         
-        // Update neuron_id if used
+        // update neuron_id if used
         events[i].neuron_id = events[i].y * 34 + events[i].x;
     }
 }
@@ -69,7 +69,7 @@ static int16_t ****allocate_frames(int num_bins, int height, int width) {
     for (int b = 0; b < num_bins; b++) {
         frames[b] = malloc(2 * sizeof(int16_t **));
         if (!frames[b]) {
-            // Clean up previous allocations
+            // clean up previous allocations
             for (int b_clean = 0; b_clean < b; b_clean++) {
                 for (int p = 0; p < 2; p++) {
                     for (int y = 0; y < height; y++) {
@@ -86,7 +86,7 @@ static int16_t ****allocate_frames(int num_bins, int height, int width) {
         for (int p = 0; p < 2; p++) {
             frames[b][p] = malloc(height * sizeof(int16_t *));
             if (!frames[b][p]) {
-                // Clean up
+                // clean up
                 for (int b_clean = 0; b_clean <= b; b_clean++) {
                     for (int p_clean = 0; p_clean < (b_clean == b ? p : 2); p_clean++) {
                         for (int y = 0; y < height; y++) {
@@ -103,7 +103,7 @@ static int16_t ****allocate_frames(int num_bins, int height, int width) {
             for (int y = 0; y < height; y++) {
                 frames[b][p][y] = calloc(width, sizeof(int16_t));
                 if (!frames[b][p][y]) {
-                    // Clean up
+                    // clean up
                     for (int b_clean = 0; b_clean <= b; b_clean++) {
                         for (int p_clean = 0; p_clean < (b_clean == b ? p+1 : 2); p_clean++) {
                             for (int y_clean = 0; y_clean < (b_clean == b && p_clean == p ? y : height); y_clean++) {
@@ -166,7 +166,7 @@ int16_t ****events_to_frames(SpikeEvent *events, size_t num_events,
     int16_t ****frames = allocate_frames(num_bins, height, width);
     if (!frames) return NULL;
 
-    // Process events per mode
+    // process events per mode
     switch (mode) {
         case FRAME_BY_N_TIME_BINS: {
             for (size_t i = 0; i < num_events; i++) {

@@ -83,7 +83,7 @@ float test(Network *network, Dataset *dataset) {
 	size_t correct_predictions = 0;
 	size_t total_samples = dataset->num_samples;
 
-	clock_t start_time = clock();  // rozpocznij pomiar
+	clock_t start_time = clock();  
 	perf_mark_start("inference");
 
 	for (size_t i = 0; i < total_samples; i++) {
@@ -135,7 +135,7 @@ float test(Network *network, Dataset *dataset) {
 		//free(input);
 	}
 
-	clock_t end_time = clock();  // zakończ pomiar
+	clock_t end_time = clock(); 
 
 	double elapsed_time = (double)(end_time - start_time) / CLOCKS_PER_SEC;
 	double avg_time_per_sample = elapsed_time / total_samples;
@@ -194,7 +194,6 @@ int  predict_single_sample(Network *network, Sample *sample, Dataset *dataset) {
 
 void optimize_network(Network* network) {
     (void)network;
-    // Baseline (no-op): optymalizacje wyłączone
 }
 
 

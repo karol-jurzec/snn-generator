@@ -44,7 +44,6 @@ BidirectionalPruningInfo* create_bidirectional_info(Network *network) {
         info->inactive_in_channels[i] = NULL;
     }
     
-    // Alokuj maski tylko dla warstw conv2d
     for (size_t i = 0; i < network->num_layers; i++) {
         LayerBase *layer = network->layers[i];
         if (layer->layer_type == LAYER_CONV2D) {
@@ -64,7 +63,7 @@ BidirectionalPruningInfo* create_bidirectional_info(Network *network) {
 
 // Maps layer connections including MaxPool2d support for accurate channel-to-neuron mapping
 void map_layer_connections(Network *network, BidirectionalPruningInfo *info) {
-    printf("\n=== MAPOWANIE POŁĄCZEŃ (z obsługą MaxPool2d) ===\n");
+    printf("\n=== mapping (including MaxPool2d) ===\n");
     
     // Simplified loop - skip last 2 layers since we look ahead
     for (size_t i = 0; i < network->num_layers - 2; i++) {
@@ -79,27 +78,25 @@ void map_layer_connections(Network *network, BidirectionalPruningInfo *info) {
             if (successor->layer_type == LAYER_MAXPOOL2D && second_successor->is_spiking) {
                 info->backward_connections[i] = i + 2;
                 info->maxpool_between_backward[i] = i + 1;
-                printf("📍 Backward: Conv2D[%zu] → MaxPool2D[%zu] → Spiking[%zu]\n", i, i+1, i+2);
+                printf("Backward: Conv2D[%zu] → MaxPool2D[%zu] → Spiking[%zu]\n", i, i+1, i+2);
             }
             // Case 2: Conv2d → Spiking (direct)
             else if (successor->is_spiking) {
                 info->backward_connections[i] = i + 1;
-                printf("📍 Backward: Conv2D[%zu] → Spiking[%zu]\n", i, i+1);
+                printf("Backward: Conv2D[%zu] → Spiking[%zu]\n", i, i+1);
             }
         }
         
-        // FORWARD: Spiking → Conv2d (MaxPool doesn't affect forward propagation)
         if (current->is_spiking) {
             for (size_t j = i + 1; j < network->num_layers - 1; j++) {
                 if (network->layers[j]->layer_type == LAYER_CONV2D) {
                     info->forward_connections[i] = j;
-                    printf("📍 Forward: Spiking[%zu] → Conv2D[%zu]\n", i, j);
+                    printf("Forward: Spiking[%zu] → Conv2D[%zu]\n", i, j);
                     break;
                 }
             }
         }
     }
-    printf("✅ Mapowanie połączeń zakończone\n");
 }
 
 // Analyzes Conv2D → [MaxPool2D] → Spiking connections for backward channel pruning
@@ -114,10 +111,10 @@ void analyze_backward_connections(Network *network, BidirectionalPruningInfo *in
             Conv2DLayer *conv = (Conv2DLayer *)network->layers[i];
             SpikingLayer *spiking = (SpikingLayer *)network->layers[spiking_idx];
             
-            printf("🔍 Analyzing Conv2D[%zu] → Spiking[%zu]\n", i, spiking_idx);
-            printf("   Conv2D: %d→%d channels, %dx%d input\n", 
+            printf("Analyzing Conv2D[%zu] → Spiking[%zu]\n", i, spiking_idx);
+            printf("Conv2D: %d→%d channels, %dx%d input\n", 
                    conv->in_channels, conv->out_channels, conv->input_dim, conv->input_dim);
-            printf("   Spiking: %zu neurons\n", spiking->num_neurons);
+            printf("Spiking: %zu neurons\n", spiking->num_neurons);
             
             int out_h = (conv->input_dim + 2*conv->padding - conv->kernel_size) / conv->stride + 1;
             int out_w = out_h;  // assuming square input
@@ -128,26 +125,23 @@ void analyze_backward_connections(Network *network, BidirectionalPruningInfo *in
                 out_h = out_h / maxpool->kernel_size;
                 out_w = out_w / maxpool->kernel_size;
                 
-                printf("   Conv2D → MaxPool2D[%d] (%dx%d) → Final: %dx%d\n", 
+                printf("Conv2D → MaxPool2D[%d] (%dx%d) → Final: %dx%d\n", 
                        maxpool_idx, maxpool->kernel_size, maxpool->kernel_size, out_h, out_w);
             } else {
-                printf("   Conv2D output (no pooling): %dx%d\n", out_h, out_w);
+                printf("Conv2D output (no pooling): %dx%d\n", out_h, out_w);
             }
 
             int neurons_per_channel = out_h * out_w;
-            printf("   Mapping: %dx%d=%d neurons per channel\n", out_h, out_w, neurons_per_channel);
+            printf("Mapping: %dx%d=%d neurons per channel\n", out_h, out_w, neurons_per_channel);
             
-            // Sprawdź każdy kanał z poprawnym mapowaniem
             for (int channel = 0; channel < conv->out_channels; channel++) {
                 bool channel_inactive = true;
                 int active_neurons_in_channel = 0;
                 
-                // Sprawdź wszystkie neurony dla tego kanału
                 for (int h = 0; h < out_h; h++) {
                     for (int w = 0; w < out_w; w++) {
                         int neuron_idx = channel * neurons_per_channel + h * out_w + w;
                         
-                        // Safety check - necessary in case of dimension mismatches
                         if (neuron_idx < spiking->num_neurons) {
                             if (spiking->total_spikes[neuron_idx] > threshold) {
                                 channel_inactive = false;
@@ -160,22 +154,18 @@ void analyze_backward_connections(Network *network, BidirectionalPruningInfo *in
                 if (channel_inactive) {
                     info->inactive_out_channels[i][channel] = true;
                     info->pruned_out_channels[i]++;
-                    printf("   ❌ Channel %d: inactive (%d spikes total)\n", channel, 0);
+                    printf("Channel %d: inactive (%d spikes total)\n", channel, 0);
                 } else {
-                    printf("   ✅ Channel %d: active (%d neurons spiking)\n", channel, active_neurons_in_channel);
+                    printf("Channel %d: active (%d neurons spiking)\n", channel, active_neurons_in_channel);
                 }
             }
             
             float pruning_ratio = (float)info->pruned_out_channels[i] / conv->out_channels * 100.0f;
-            printf("   📊 Result: %zu/%d channels pruned (%.1f%%)\n", 
-                   info->pruned_out_channels[i], conv->out_channels, pruning_ratio);
         }
     }
 }
 
-void analyze_forward_connections(Network *network, BidirectionalPruningInfo *info) {
-    printf("\n--- FORWARD PRUNING: Spiking → Conv2D Propagation ---\n");
-    
+void analyze_forward_connections(Network *network, BidirectionalPruningInfo *info) {    
     for (size_t i = 0; i < network->num_layers; i++) {
         if (info->forward_connections[i] != -1) {
             size_t conv_idx = info->forward_connections[i];
@@ -185,19 +175,14 @@ void analyze_forward_connections(Network *network, BidirectionalPruningInfo *inf
             
             SpikingLayer *spiking = (SpikingLayer *)spiking_layer;
             Conv2DLayer *conv = (Conv2DLayer *)conv_layer;
-            
-            printf("🔄 Propagating: Spiking[%zu] → Conv2D[%zu]\n", i, conv_idx);
-            
-            // Znajdź poprzednią conv2d warstwę która produkuje input dla tej spiking
+                        
             Conv2DLayer *prev_conv = NULL;
             for (int j = i - 1; j >= 0; j--) {
                 if (network->layers[j]->layer_type == LAYER_CONV2D) {
                     prev_conv = (Conv2DLayer *)network->layers[j];
                     printf("   Input pochodzi z Conv2D[%d]: %d channels\n", j, prev_conv->out_channels);
                     
-                    // Sprawdź czy poprzednia conv2d ma inactive channels
                     if (info->inactive_out_channels[j]) {
-                        // Propaguj te same maski jako input channels
                         size_t propagated_count = 0;
                         
                         for (int ch = 0; ch < prev_conv->out_channels && ch < conv->in_channels; ch++) {
@@ -209,25 +194,21 @@ void analyze_forward_connections(Network *network, BidirectionalPruningInfo *inf
                         
                         info->pruned_in_channels[conv_idx] = propagated_count;
                         
-                        printf("   ✅ Propagated %zu inactive channels to Conv2D[%zu] input\n", 
+                        printf("Propagated %zu inactive channels to Conv2D[%zu] input\n", 
                                propagated_count, conv_idx);
                     } else {
-                        printf("   ℹ️  No inactive channels to propagate from Conv2D[%d]\n", j);
+                        printf("No inactive channels to propagate from Conv2D[%d]\n", j);
                     }
                     break;
                 }
             }
             
-            if (!prev_conv) {
-                printf("   ⚠️  Warning: No previous Conv2D found for Spiking[%zu]\n", i);
-            }
         }
     }
 }
 
-// Analyzes bidirectional pruning opportunities with automatic MaxPool2d detection
 BidirectionalPruningInfo* analyze_bidirectional_activity(Network *network, int threshold) {
-    printf("\n🔄 === BIDIRECTIONAL PRUNING ANALYSIS (MaxPool2d aware) ===\n");
+    printf("\n=== BIDIRECTIONAL PRUNING ANALYSIS (MaxPool2d aware) ===\n");
     printf("Threshold: %d spikes\n", threshold);
     
     BidirectionalPruningInfo *info = create_bidirectional_info(network);
@@ -241,8 +222,6 @@ BidirectionalPruningInfo* analyze_bidirectional_activity(Network *network, int t
 }
 
 void calculate_pruning_statistics(Network *network, BidirectionalPruningInfo *info) {
-    printf("\n--- COMPUTING PRUNING STATISTICS ---\n");
-    
     size_t total_out_channels = 0, total_pruned_out = 0;
     size_t total_in_channels = 0, total_pruned_in = 0;
     
@@ -259,39 +238,31 @@ void calculate_pruning_statistics(Network *network, BidirectionalPruningInfo *in
             // Forward pruning stats
             total_in_channels += conv->in_channels;
             total_pruned_in += info->pruned_in_channels[i];
-            
-            printf("Conv2D[%zu]: out %zu/%d pruned, in %zu/%d pruned\n",
-                   i, info->pruned_out_channels[i], conv->out_channels,
-                   info->pruned_in_channels[i], conv->in_channels);
         }
     }
     
     info->total_backward_reduction = (float)total_pruned_out / total_out_channels * 100.0f;
     info->total_forward_reduction = (float)total_pruned_in / total_in_channels * 100.0f;
     
-    // Combined reduction (aproximadamente multiplicative)
     float backward_efficiency = 1.0f - info->total_backward_reduction / 100.0f;
     float forward_efficiency = 1.0f - info->total_forward_reduction / 100.0f;
     info->combined_reduction = (1.0f - backward_efficiency * forward_efficiency) * 100.0f;
     
-    printf("\n📊 PRUNING STATISTICS:\n");
-    printf("   Backward reduction: %.1f%% (%zu/%zu out_channels)\n", 
+    printf("\nPRUNING STATISTICS:\n");
+    printf("Backward reduction: %.1f%% (%zu/%zu out_channels)\n", 
            info->total_backward_reduction, total_pruned_out, total_out_channels);
-    printf("   Forward reduction:  %.1f%% (%zu/%zu in_channels)\n", 
+    printf("Forward reduction:  %.1f%% (%zu/%zu in_channels)\n", 
            info->total_forward_reduction, total_pruned_in, total_in_channels);
-    printf("   Combined reduction: ~%.1f%% (theoretical)\n", info->combined_reduction);
+    printf("Combined reduction: ~%.1f%% (theoretical)\n", info->combined_reduction);
 }
 
-void reset_bidirectional_pruning(Network *network) {
-    printf("Resetowanie bidirectional pruning...\n");
-    
+void reset_bidirectional_pruning(Network *network) {    
     for (size_t i = 0; i < network->num_layers; i++) {
         LayerBase *layer = network->layers[i];
         
         if (layer->layer_type == LAYER_CONV2D) {
             Conv2DLayer *conv = (Conv2DLayer *)layer;
             
-            // 🔄 RESET CHANNEL COMPRESSION - przywróć oryginalne wymiary
             if (conv->out_active_channels_idx) {
                 free(conv->out_active_channels_idx);
                 conv->out_active_channels_idx = NULL;
@@ -302,14 +273,13 @@ void reset_bidirectional_pruning(Network *network) {
                 conv->in_active_channels_idx = NULL;
             }
             
-            // Przywróć oryginalne wymiary
             conv->out_channels = conv->original_out_channels;
             conv->in_channels = conv->original_in_channels;
             
         }
     }
     
-    // Reset spike counters (bez zmian)
+    // Reset spike counters
     for (size_t i = 0; i < network->num_layers; i++) {
         LayerBase *layer = network->layers[i];
         
@@ -323,42 +293,30 @@ void reset_bidirectional_pruning(Network *network) {
         }
     }
     
-    printf("✅ Bidirectional pruning reset completed\n");
 }
     
 
 void apply_bidirectional_pruning(Network *network, BidirectionalPruningInfo *info) {
-    printf("\n=== APLIKOWANIE BIDIRECTIONAL PRUNING Z COMPRESSION ===\n");
-    
     for (size_t i = 0; i < network->num_layers; i++) {
         LayerBase *layer = network->layers[i];
         
         if (layer->layer_type == LAYER_CONV2D) {
             Conv2DLayer *conv = (Conv2DLayer *)layer;
             
-            // Sprawdź czy są zmiany do zastosowania
             bool has_out_pruning = info->pruned_out_channels[i] > 0;
             bool has_in_pruning = info->pruned_in_channels[i] > 0;
             
             if (has_out_pruning || has_in_pruning) {
-                printf("  Conv2D[%zu]: Applying compression...\n", i);
-                
-                // 🚀 UŻYJ NOWEJ FUNKCJI COMPRESSION zamiast memcpy masek
-                apply_channel_compression(conv, 
-                                        info->inactive_out_channels[i], 
-                                        info->inactive_in_channels[i]);
-                
-                printf("    ✅ Compression applied: %zu out + %zu in channels pruned\n", 
-                       info->pruned_out_channels[i], info->pruned_in_channels[i]);
+                apply_channel_compression(conv,info->inactive_out_channels[i], info->inactive_in_channels[i]);
             }
         }
     }
     
-    printf("✅ Bidirectional pruning with compression applied\n");
+    printf("Bidirectional pruning with compression applied\n");
 }
 
 void print_bidirectional_stats(BidirectionalPruningInfo *info) {
-    printf("\n📊 === BIDIRECTIONAL PRUNING SUMMARY ===\n");
+    printf("\n=== BIDIRECTIONAL PRUNING SUMMARY ===\n");
     printf("Backward pruning: %.1f%% output channels removed\n", info->total_backward_reduction);
     printf("Forward pruning:  %.1f%% input channels removed\n", info->total_forward_reduction);
     printf("Combined effect:  ~%.1f%% computation reduction\n", info->combined_reduction);
@@ -406,12 +364,10 @@ void test_bidirectional_pruning(const char *architecture_path, const char *weigh
     printf("Threshold: %d spikes\n", spike_threshold);
     printf("=========================================\n\n");
 
-    // Wczytaj sieć
     Network *network = initialize_network_from_file(architecture_path, input_width, input_height, no_channels);
     if (!network) return;
     load_weights_from_json(network, weights_path);
     
-    // Wczytaj i podziel dataset (pierwszy num_samples do testu, drugi do analizy)
     int total_samples = num_samples * 2;
     Dataset *full_dataset = load_dataset(dataset_path, format, total_samples, false, true);
     if (!full_dataset) {
@@ -435,7 +391,6 @@ void test_bidirectional_pruning(const char *architecture_path, const char *weigh
     analysis_dataset->num_classes = full_dataset->num_classes;
     analysis_dataset->samples = &full_dataset->samples[num_samples / 2];
 
-    // BASELINE: Test bez pruning
     printf("🎯 BASELINE: Test bez pruning...\n");
     clock_t start = clock();
     float baseline_acc = test(network, test_dataset);
@@ -443,7 +398,6 @@ void test_bidirectional_pruning(const char *architecture_path, const char *weigh
     double baseline_time = ((double)(end - start)) / CLOCKS_PER_SEC;
     printf("   Accuracy: %.2f%%, Time: %.3fs\n\n", baseline_acc, baseline_time);
 
-    // Przeprowadź analizę aktywności
     printf("🔍 ANALYSIS: Gathering spike activity...\n");
     reset_bidirectional_pruning(network);
     
@@ -451,11 +405,9 @@ void test_bidirectional_pruning(const char *architecture_path, const char *weigh
 
     BidirectionalPruningInfo *info = analyze_bidirectional_activity(network, spike_threshold);
     
-    // Apply bidirectional pruning
     printf("🔄 APPLYING BIDIRECTIONAL PRUNING...\n");
     apply_bidirectional_pruning(network, info);
     
-    // Test z bidirectional pruning
     start = clock();
     float pruned_acc = test(network, test_dataset);
     end = clock();
@@ -470,7 +422,6 @@ void test_bidirectional_pruning(const char *architecture_path, const char *weigh
     printf("Backward reduction: %.1f%%\n", info->total_backward_reduction);
     printf("Combined reduction: %.1f%%\n", info->combined_reduction);
     
-    // Cleanup
     free_bidirectional_pruning_info(info);
     free(test_dataset);
     free(analysis_dataset);

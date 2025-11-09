@@ -52,8 +52,6 @@ void conv2d_initialize(Conv2DLayer *layer, int in_channels, int out_channels, in
     layer->base.num_weights = weight_size;
     layer->biases = (float *)malloc(out_channels * sizeof(float));
 
-    initialize_biases(layer->biases, out_channels, in_channels * kernel_size * kernel_size);
-
     layer->base.inputs = (float *)malloc(input_dim * input_dim * layer->in_channels  * sizeof(float));
 }
 
