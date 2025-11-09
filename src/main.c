@@ -25,7 +25,7 @@ void test_nmnist_pruning() {
         "snn_nmnist_weights_bs_32.json",          // wagi
         "C:/Users/karol/Desktop/karol/agh/praca_snn/data/NMNIST/Test", // dataset
         100,                                        // liczba próbek do analizy
-        1000,                                        // threshold spike-ów (0 = wszystkie bez spike-ów)
+        0,                                        // threshold spike-ów (0 = wszystkie bez spike-ów)
 		FORMAT_NMNIST,
 		34, 34, 2
 	);
@@ -58,10 +58,22 @@ void test_stmnist_bidirectional_pruning() {
         "scnn_stmnist_architecture.json",           
         "scnn_stmnist_weights_bs_64.json",          
         "C:/Users/karol/Desktop/karol/agh/praca_snn/dataset/STMNIST/data_submission", 
-        250,                                      // więcej próbek dla wiarygodności
+        50,                                      // więcej próbek dla wiarygodności
         0,                                        // threshold
         FORMAT_STMNIST,
         10, 10, 2
+    );
+}
+
+void test_nmnist_bidirectional_pruning() {
+    test_bidirectional_pruning(
+        "snn_nmnist_architecture.json",           // architektura
+        "snn_nmnist_weights_bs_32.json",          // wagi
+        "C:/Users/karol/Desktop/karol/agh/praca_snn/data/NMNIST/Test", // dataset
+        10,                                        // liczba próbek do analizy
+        0,                                        // threshold spike-ów (0 = wszystkie bez spike-ów)
+		FORMAT_NMNIST,
+		34, 34, 2
     );
 }
 
@@ -87,8 +99,9 @@ int main(int argc, char *argv[]) {
     //study_stmnist_threshold_impact();
 
 	//test_nmnist_bidirectional_pruning();
-	//test_stmnist_pruning();
 	test_stmnist_bidirectional_pruning();
+
+	//test_nmnist_bidirectional_pruning();
 
 	double t1 = now_seconds();
 	printf("train_test() took %.6f seconds\n", t1 - t0);

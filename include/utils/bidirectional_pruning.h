@@ -9,6 +9,7 @@
 #include "dataset_loader.h"
 
 // Struktura dla bidirectional pruning (backward + forward)
+// Dodaj nowe pola dla obsługi MaxPool2d:
 typedef struct {
     size_t num_layers;
     
@@ -16,22 +17,25 @@ typedef struct {
     int *inactive_neurons_count;
     float *layer_activity_ratio;
     
-    // BACKWARD PRUNING: Spiking → Conv2d (output channels)
-    bool **inactive_out_channels;    // Które out_channels usunąć z Conv2d
-    size_t *pruned_out_channels;
+    // BACKWARD PRUNING: Conv2d → [MaxPool2d] → Spiking
+    bool **inactive_out_channels;        
+    size_t *pruned_out_channels;         
     
-    // FORWARD PRUNING: Conv2d → Spiking (input channels)  
-    bool **inactive_in_channels;     // Które in_channels usunąć z Conv2d
-    size_t *pruned_in_channels;
+    // FORWARD PRUNING: Spiking → Conv2d
+    bool **inactive_in_channels;         
+    size_t *pruned_in_channels;          
     
-    // Mapowanie połączeń między warstwami
-    int *backward_connections;       // conv_layer_idx → spiking_layer_idx  
-    int *forward_connections;        // spiking_layer_idx → conv_layer_idx
+    // 🆕 CONNECTION MAPPING WITH MAXPOOL SUPPORT
+    int *backward_connections;           // conv_idx → spiking_idx 
+    int *forward_connections;            // spiking_idx → next_conv_idx
+    int *maxpool_between_backward;       // maxpool_idx between conv→spiking (-1 if none)
+    int *maxpool_between_forward;        // maxpool_idx between spiking→conv (-1 if none)
     
-    // Statystyki
-    float total_backward_reduction;  // % redukcja przez backward pruning
-    float total_forward_reduction;   // % redukcja przez forward pruning
-    float combined_reduction;        // Łączna redukcja obliczeń
+    // Statistics
+    float total_backward_reduction;
+    float total_forward_reduction;
+    float combined_reduction;
+    
 } BidirectionalPruningInfo;
 
 // Główne funkcje

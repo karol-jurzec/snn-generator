@@ -4,36 +4,32 @@ import matplotlib.pyplot as plt
 # Wczytaj dane z pliku CSV
 df = pd.read_csv("stmnist_pruning_threshold_study.csv")
 
-# Tworzenie wykresów
-plt.figure(figsize=(15, 5))
-
 # Accuracy vs Threshold
-plt.subplot(1, 3, 1)
+plt.figure(figsize=(7, 5))
 plt.plot(df["threshold"], df["accuracy_after"], marker="o", label="Accuracy after pruning")
 plt.xlabel("Threshold")
 plt.ylabel("Accuracy [%]")
-plt.title("Accuracy vs Threshold")
-plt.grid(True)
+plt.title("Impact of ST-MNIST prunning threshold on accuracy")
 plt.legend()
+plt.savefig("accuracy_vs_threshold.png", dpi=300)
+plt.show()
 
 # Speedup vs Threshold
-plt.subplot(1, 3, 2)
+plt.figure(figsize=(7, 5))
 plt.plot(df["threshold"], df["speedup"], marker="o", color="orange", label="Speedup")
 plt.xlabel("Threshold")
 plt.ylabel("Speedup (x)")
-plt.title("Speedup vs Threshold")
-plt.grid(True)
+plt.title("Impact of ST-MNIST prunning threshold on speedup")
 plt.legend()
+plt.savefig("speedup_vs_threshold.png", dpi=300)
+plt.show()
 
 # Pruning % vs Threshold
-plt.subplot(1, 3, 3)
+plt.figure(figsize=(7, 5))
 plt.plot(df["threshold"], df["pruning_percentage"], marker="o", color="green", label="Pruning %")
 plt.xlabel("Threshold")
 plt.ylabel("Pruning Percentage [%]")
-plt.title("Pruning Percentage vs Threshold")
-plt.grid(True)
+plt.title("Impact of ST-MNIST prunning threshold on prunning percentage")
 plt.legend()
-
-plt.tight_layout()
-plt.savefig("pruning_analysis_clean.png", dpi=300)  # zapis do pliku PNG
+plt.savefig("pruning_percentage_vs_threshold.png", dpi=300)
 plt.show()

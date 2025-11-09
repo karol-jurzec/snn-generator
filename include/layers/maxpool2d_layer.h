@@ -16,9 +16,6 @@ typedef struct {
     float *input;
     float *output;          // Output feature map (after pooling)
     size_t output_size;     // Size of the output feature map
-
-    size_t *max_indices;    // Stores the indices of max values for backpropagation
-
 } MaxPool2DLayer;
 
 

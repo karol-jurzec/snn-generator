@@ -26,14 +26,20 @@ BidirectionalPruningInfo* create_bidirectional_info(Network *network) {
     info->inactive_in_channels = (bool **)malloc(network->num_layers * sizeof(bool *));
     info->pruned_in_channels = (size_t *)calloc(network->num_layers, sizeof(size_t));
     
-    // Connection mapping
+    // Connection mapping (including MaxPool2d support)
     info->backward_connections = (int *)malloc(network->num_layers * sizeof(int));
     info->forward_connections = (int *)malloc(network->num_layers * sizeof(int));
     
-    // Initialize connection arrays to -1 (no connection)
+    // MaxPool2d tracking arrays 
+    info->maxpool_between_backward = (int *)malloc(network->num_layers * sizeof(int));
+    info->maxpool_between_forward = (int *)malloc(network->num_layers * sizeof(int));
+    
+    // Initialize all connections to -1 (no connection/no MaxPool)
     for (size_t i = 0; i < network->num_layers; i++) {
         info->backward_connections[i] = -1;
         info->forward_connections[i] = -1;
+        info->maxpool_between_backward[i] = -1;
+        info->maxpool_between_forward[i] = -1;
         info->inactive_out_channels[i] = NULL;
         info->inactive_in_channels[i] = NULL;
     }
@@ -56,64 +62,92 @@ BidirectionalPruningInfo* create_bidirectional_info(Network *network) {
     return info;
 }
 
+// Maps layer connections including MaxPool2d support for accurate channel-to-neuron mapping
 void map_layer_connections(Network *network, BidirectionalPruningInfo *info) {
-    printf("\n=== MAPOWANIE POŁĄCZEŃ MIĘDZY WARSTWAMI ===\n");
+    printf("\n=== MAPOWANIE POŁĄCZEŃ (z obsługą MaxPool2d) ===\n");
     
-    for (size_t i = 0; i < network->num_layers - 1; i++) {
-        LayerBase *current_layer = network->layers[i];
-        LayerBase *next_layer = network->layers[i + 1];
+    // Simplified loop - skip last 2 layers since we look ahead
+    for (size_t i = 0; i < network->num_layers - 2; i++) {
+        LayerBase *current = network->layers[i];
         
-        // BACKWARD: Conv2d → Spiking (dla backward pruning)
-        if (current_layer->layer_type == LAYER_CONV2D && next_layer->is_spiking) {
-            info->backward_connections[i] = i + 1;  // conv[i] → spiking[i+1]
-            printf("📍 Backward connection: Conv2D[%zu] → Spiking[%zu]\n", i, i+1);
+        // BACKWARD: Conv2d → [MaxPool2d] → Spiking
+        if (current->layer_type == LAYER_CONV2D) {
+            LayerBase *successor = network->layers[i + 1];
+            LayerBase *second_successor = network->layers[i + 2];
+            
+            // Case 1: Conv2d → MaxPool2d → Spiking
+            if (successor->layer_type == LAYER_MAXPOOL2D && second_successor->is_spiking) {
+                info->backward_connections[i] = i + 2;
+                info->maxpool_between_backward[i] = i + 1;
+                printf("📍 Backward: Conv2D[%zu] → MaxPool2D[%zu] → Spiking[%zu]\n", i, i+1, i+2);
+            }
+            // Case 2: Conv2d → Spiking (direct)
+            else if (successor->is_spiking) {
+                info->backward_connections[i] = i + 1;
+                printf("📍 Backward: Conv2D[%zu] → Spiking[%zu]\n", i, i+1);
+            }
         }
         
-        // FORWARD: Spiking → Conv2d (dla forward pruning)
-        if (current_layer->is_spiking && next_layer->layer_type == LAYER_CONV2D) {
-            info->forward_connections[i] = i + 1;   // spiking[i] → conv[i+1]
-            printf("📍 Forward connection: Spiking[%zu] → Conv2D[%zu]\n", i, i+1);
+        // FORWARD: Spiking → Conv2d (MaxPool doesn't affect forward propagation)
+        if (current->is_spiking) {
+            for (size_t j = i + 1; j < network->num_layers - 1; j++) {
+                if (network->layers[j]->layer_type == LAYER_CONV2D) {
+                    info->forward_connections[i] = j;
+                    printf("📍 Forward: Spiking[%zu] → Conv2D[%zu]\n", i, j);
+                    break;
+                }
+            }
         }
     }
     printf("✅ Mapowanie połączeń zakończone\n");
 }
 
+// Analyzes Conv2D → [MaxPool2D] → Spiking connections for backward channel pruning
 void analyze_backward_connections(Network *network, BidirectionalPruningInfo *info, int threshold) {
-    printf("\n--- BACKWARD PRUNING: Conv2D → Spiking Analysis ---\n");
+    printf("\n--- BACKWARD PRUNING: Conv2D → [MaxPool2D] → Spiking Analysis ---\n");
     
     for (size_t i = 0; i < network->num_layers; i++) {
         if (info->backward_connections[i] != -1) {
             size_t spiking_idx = info->backward_connections[i];
+            size_t maxpool_idx = info->maxpool_between_backward[i];
             
-            LayerBase *conv_layer = network->layers[i];
-            LayerBase *spiking_layer = network->layers[spiking_idx];
-            
-            Conv2DLayer *conv = (Conv2DLayer *)conv_layer;
-            SpikingLayer *spiking = (SpikingLayer *)spiking_layer;
+            Conv2DLayer *conv = (Conv2DLayer *)network->layers[i];
+            SpikingLayer *spiking = (SpikingLayer *)network->layers[spiking_idx];
             
             printf("🔍 Analyzing Conv2D[%zu] → Spiking[%zu]\n", i, spiking_idx);
             printf("   Conv2D: %d→%d channels, %dx%d input\n", 
                    conv->in_channels, conv->out_channels, conv->input_dim, conv->input_dim);
             printf("   Spiking: %zu neurons\n", spiking->num_neurons);
             
-            // Oblicz wymiary po conv2d (bez MaxPool!)
-            int conv_out_h = (conv->input_dim + 2*conv->padding - conv->kernel_size) / conv->stride + 1;
-            int conv_out_w = conv_out_h;
-            int neurons_per_channel = conv_out_h * conv_out_w;
+            int out_h = (conv->input_dim + 2*conv->padding - conv->kernel_size) / conv->stride + 1;
+            int out_w = out_h;  // assuming square input
             
-            printf("   Mapping: %dx%d=%d neurons per channel\n", 
-                   conv_out_h, conv_out_w, neurons_per_channel);
+            // Apply MaxPool2d if present
+            if (maxpool_idx != -1) {
+                MaxPool2DLayer *maxpool = (MaxPool2DLayer *)network->layers[maxpool_idx];
+                out_h = out_h / maxpool->kernel_size;
+                out_w = out_w / maxpool->kernel_size;
+                
+                printf("   Conv2D → MaxPool2D[%d] (%dx%d) → Final: %dx%d\n", 
+                       maxpool_idx, maxpool->kernel_size, maxpool->kernel_size, out_h, out_w);
+            } else {
+                printf("   Conv2D output (no pooling): %dx%d\n", out_h, out_w);
+            }
+
+            int neurons_per_channel = out_h * out_w;
+            printf("   Mapping: %dx%d=%d neurons per channel\n", out_h, out_w, neurons_per_channel);
             
-            // Sprawdź każdy kanał
+            // Sprawdź każdy kanał z poprawnym mapowaniem
             for (int channel = 0; channel < conv->out_channels; channel++) {
                 bool channel_inactive = true;
                 int active_neurons_in_channel = 0;
                 
                 // Sprawdź wszystkie neurony dla tego kanału
-                for (int h = 0; h < conv_out_h; h++) {
-                    for (int w = 0; w < conv_out_w; w++) {
-                        int neuron_idx = channel * neurons_per_channel + h * conv_out_w + w;
+                for (int h = 0; h < out_h; h++) {
+                    for (int w = 0; w < out_w; w++) {
+                        int neuron_idx = channel * neurons_per_channel + h * out_w + w;
                         
+                        // Safety check - necessary in case of dimension mismatches
                         if (neuron_idx < spiking->num_neurons) {
                             if (spiking->total_spikes[neuron_idx] > threshold) {
                                 channel_inactive = false;
@@ -191,23 +225,10 @@ void analyze_forward_connections(Network *network, BidirectionalPruningInfo *inf
     }
 }
 
+// Analyzes bidirectional pruning opportunities with automatic MaxPool2d detection
 BidirectionalPruningInfo* analyze_bidirectional_activity(Network *network, int threshold) {
-    printf("\n🔄 === BIDIRECTIONAL PRUNING ANALYSIS ===\n");
+    printf("\n🔄 === BIDIRECTIONAL PRUNING ANALYSIS (MaxPool2d aware) ===\n");
     printf("Threshold: %d spikes\n", threshold);
-    
-    for (size_t i = 0; i < network->num_layers; i++) {
-        LayerBase *layer = network->layers[i];
-        if (layer->is_spiking) {
-            SpikingLayer *spiking = (SpikingLayer *)layer;
-            if (spiking->total_spikes) {
-                for (size_t j = 0; j < spiking->num_neurons; j++) {
-                    if (spiking->total_spikes[j] > 0) {
-                        break;
-                    }
-                }
-            }
-        }
-    }
     
     BidirectionalPruningInfo *info = create_bidirectional_info(network);
     
