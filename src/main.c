@@ -12,7 +12,6 @@
 #include "../include/utils/channel_pruning.h"
 #include "../include/utils/bidirectional_pruning.h"
 
-
 static double now_seconds(void) {
     struct timeval tv;
     gettimeofday(&tv, NULL);
@@ -20,66 +19,96 @@ static double now_seconds(void) {
 }
 
 void test_nmnist_pruning() {
+    const char *dataset_path = getenv("NMNIST_TEST_PATH");
+    if (!dataset_path) {
+        fprintf(stderr, "Error: NMNIST_TEST_PATH environment variable not set\n");
+        return;
+    }
+    
     test_channel_pruning(
-        "snn_nmnist_architecture.json",           // architektura
-        "snn_nmnist_weights_bs_32.json",          // wagi
-        "C:/Users/karol/Desktop/karol/agh/praca_snn/data/NMNIST/Test", // dataset
-        100,                                        // liczba próbek do analizy
-        0,                                        // threshold spike-ów (0 = wszystkie bez spike-ów)
+        "snn_nmnist_architecture.json",
+        "snn_nmnist_weights_bs_32.json", 
+        dataset_path, 
+        100,                                        
+        0, // threshold value
 		FORMAT_NMNIST,
 		34, 34, 2
 	);
 }
 
 void test_stmnist_pruning() {
+    const char *dataset_path = getenv("STMNIST_TEST_PATH");
+    if (!dataset_path) {
+        fprintf(stderr, "Error: STMNIST_TEST_PATH environment variable not set\n");
+        return;
+    }
+    
     test_channel_pruning(
-        "scnn_stmnist_architecture.json",           // architektura
-        "scnn_stmnist_weights_bs_64.json",          // wagi
-        "C:/Users/karol/Desktop/karol/agh/praca_snn/dataset/STMNIST/data_submission", // dataset
-        250,                                        // liczba próbek do analizy
-        0,                                         // threshold spike-ów (0 = wszystkie bez spike-ów)
+        "scnn_stmnist_architecture.json",        
+        "scnn_stmnist_weights_bs_64.json",     
+        dataset_path,
+        250,                                       
+        0, // threshold value
 		FORMAT_STMNIST,
 		10, 10, 2
 	);
 }
 
 void study_stmnist_threshold_impact() {
+    const char *dataset_path = getenv("STMNIST_TEST_PATH");
+    if (!dataset_path) {
+        fprintf(stderr, "Error: STMNIST_TEST_PATH environment variable not set\n");
+        return;
+    }
+    
     study_threshold_impact(
-        "scnn_stmnist_architecture.json",           // architektura
-        "scnn_stmnist_weights_bs_64.json",          // wagi  
-        "C:/Users/karol/Desktop/karol/agh/praca_snn/dataset/STMNIST/data_submission", // dataset
-        "stmnist_pruning_threshold_study.csv",      // plik wyników
-        250                                         // liczba próbek (250 do analizy + 250 do testów)
+        "scnn_stmnist_architecture.json",          
+        "scnn_stmnist_weights_bs_64.json",         
+        dataset_path,
+        "stmnist_pruning_threshold_study.csv",   
+        250 
     );
 }
 
 void test_stmnist_bidirectional_pruning() {
+    const char *dataset_path = getenv("STMNIST_TEST_PATH");
+    if (!dataset_path) {
+        fprintf(stderr, "Error: STMNIST_TEST_PATH environment variable not set\n");
+        return;
+    }
+    
     test_bidirectional_pruning(
         "scnn_stmnist_architecture.json",           
         "scnn_stmnist_weights_bs_64.json",          
-        "C:/Users/karol/Desktop/karol/agh/praca_snn/dataset/STMNIST/data_submission", 
-        50,                                      // więcej próbek dla wiarygodności
-        0,                                        // threshold
+        dataset_path, 
+        50,   
+        0, // threshold
         FORMAT_STMNIST,
         10, 10, 2
     );
 }
 
 void test_nmnist_bidirectional_pruning() {
+    const char *dataset_path = getenv("NMNIST_TEST_PATH");
+    if (!dataset_path) {
+        fprintf(stderr, "Error: NMNIST_TEST_PATH environment variable not set\n");
+        return;
+    }
+    
     test_bidirectional_pruning(
-        "snn_nmnist_architecture.json",           // architektura
-        "snn_nmnist_weights_bs_32.json",          // wagi
-        "C:/Users/karol/Desktop/karol/agh/praca_snn/data/NMNIST/Test", // dataset
-        10,                                        // liczba próbek do analizy
-        0,                                        // threshold spike-ów (0 = wszystkie bez spike-ów)
+        "snn_nmnist_architecture.json",          
+        "snn_nmnist_weights_bs_32.json", 
+        dataset_path, 
+        10,                                       
+        0,                                     
 		FORMAT_NMNIST,
 		34, 34, 2
     );
 }
 
+
 int main(int argc, char *argv[]) {
 	
-	//nmnist_loader_test();
 	srand(42);
 
 	int perf_mode = 0;
@@ -92,13 +121,7 @@ int main(int argc, char *argv[]) {
 
 	double t0 = now_seconds();
 
-	//loader_test();
-	//nmnist_test();
-	//stmnist_test();
-
-    //study_stmnist_threshold_impact();
-
-	//test_nmnist_bidirectional_pruning();
+	
 	test_stmnist_bidirectional_pruning();
 
 	//test_nmnist_bidirectional_pruning();
@@ -107,9 +130,6 @@ int main(int argc, char *argv[]) {
 	printf("train_test() took %.6f seconds\n", t1 - t0);
 
 	if (perf_mode) perf_report();
-
-	//iris_classification_example();
-	//hor_vert_dataset();
 
 	return 0;
 }

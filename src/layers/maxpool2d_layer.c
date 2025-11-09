@@ -24,16 +24,13 @@ void maxpool2d_initialize(MaxPool2DLayer *layer, int kernel_size, int stride, in
     size_t output_W = (W - kernel_size + 2 * padding) / stride + 1;
     size_t output_size = C * output_H * output_W;
 
-    // Save sizes
     layer->input_size = input_size;
     layer->base.num_inputs = input_size;
     layer->base.output_size = output_size;
 
-    // Allocate memory
     layer->base.inputs = (float *)malloc(input_size * sizeof(float));
     layer->base.output = (float *)malloc(output_size * sizeof(float));
 
-    // Function pointers
     layer->base.forward = maxpool2d_forward;
 }
 

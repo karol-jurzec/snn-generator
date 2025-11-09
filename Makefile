@@ -1,9 +1,3 @@
-#OPENBLAS_INCLUDE = /ucrt64/include/openblas
-#OPENBLAS_LIB = /ucrt64/lib
-
-OPENBLAS_INCLUDE = /mingw64/include/openblas
-OPENBLAS_LIB = /mingw64/lib
-
 #HDF5_INCLUDE = /c/Program\ Files/HDF_Group/HDF5/1.14.6/include
 #HDF5_LIB = /c/Program\ Files/HDF_Group/HDF5/1.14.6/lib
 
@@ -12,7 +6,7 @@ CC = gcc
 CFLAGS = -Wall -Wextra -g -I$(INCLUDE_DIR) -I$(JSON_C_INCLUDE) #-I$(HDF5_INCLUDE) 
 
 LDFLAGS = -L$(JSON_C_LIB) # -L$(HDF5_LIB)
-LDLIBS = -ljson-c -lpthread -lm -lopenblas -lmatio -lpsapi#-lhdf5
+LDLIBS = -ljson-c -lpthread -lm -lmatio -lpsapi#-lhdf5
 
 # Directories
 SRC_DIR = src

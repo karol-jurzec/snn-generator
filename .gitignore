@@ -1,0 +1,30 @@
+# Build artifacts
+build/
+out/
+*.o
+*.exe
+*.a
+*.so
+*.dll
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.log
+*.tmp
+*.csv
+*.png
+*.txt
+
+# Compiled binaries
+snn_generator
+snn_generator.exe

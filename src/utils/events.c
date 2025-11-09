@@ -256,16 +256,10 @@ float *flatten_frames_to_float(int16_t ****frames, int bins, int height, int wid
         for (int c = 0; c < 2; c++) {
             for (int y = 0; y < height; y++) {
                 for (int x = 0; x < width; x++) {
-                    // size_t idx = ((size_t)c * bins * height * width) +
-                    //              ((size_t)b * height * width) +
-                    //              ((size_t)y * width) + x;
-
                     size_t idx = ((size_t)b * 2 * height * width) +
                                  ((size_t)c * height * width) +
                                  ((size_t)y * width) + x;
                     
-
-
                     output[idx] = (float)frames[b][c][y][x];
                 }
             }

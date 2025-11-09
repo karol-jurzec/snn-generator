@@ -44,7 +44,7 @@ void free_dataset(Dataset *dataset) {
 int add_sample_to_dataset(Dataset *dataset, const SpikeEvent *events, size_t num_events, int label) {
     if (!dataset || !events || num_events == 0) return -1;
 
-    // Reallocate if needed
+    // reallocate if needed 
     if (dataset->num_samples >= (size_t)-1 / sizeof(Sample)) return -1;
     
     Sample *new_samples = realloc(dataset->samples, (dataset->num_samples + 1) * sizeof(Sample));
@@ -53,7 +53,7 @@ int add_sample_to_dataset(Dataset *dataset, const SpikeEvent *events, size_t num
     dataset->samples = new_samples;
     size_t idx = dataset->num_samples++;
 
-    // Copy events
+    // copy events
     dataset->samples[idx].events = malloc(num_events * sizeof(SpikeEvent));
     if (!dataset->samples[idx].events) {
         dataset->num_samples--;
@@ -70,12 +70,10 @@ int add_sample_to_dataset(Dataset *dataset, const SpikeEvent *events, size_t num
     return 0;
 }
 
-Dataset *load_dataset(const char *source_path, DatasetFormat format, 
-                     size_t max_samples, bool stabilize, bool denoise) {
+Dataset *load_dataset(const char *source_path, DatasetFormat format, size_t max_samples, bool stabilize, bool denoise) {
     switch (format) {
         case FORMAT_NMNIST:
             return load_nmnist_dataset(source_path, max_samples, stabilize, denoise);
-        // Other formats would be added here
         case FORMAT_STMNIST:
             return load_stmnist_dataset(source_path, max_samples, stabilize, denoise);
         default:

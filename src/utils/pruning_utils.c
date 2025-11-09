@@ -2,7 +2,7 @@
 
 
 void apply_channel_compression(Conv2DLayer *layer, bool *inactive_out, bool *inactive_in) {
-    // Build output channel mapping
+    // build output channel mapping
     int active_out_count = 0;
     for (int i = 0; i < layer->original_out_channels; i++) {
         if (!inactive_out || !inactive_out[i]) {
@@ -18,10 +18,10 @@ void apply_channel_compression(Conv2DLayer *layer, bool *inactive_out, bool *ina
                 layer->out_active_channels_idx[idx++] = i;
             }
         }
-        layer->out_channels = active_out_count;  // UPDATE effective channels
+        layer->out_channels = active_out_count; 
     }
     
-    // Build input channel mapping  
+    //build input channel mapping  
     int active_in_count = 0;
     for (int i = 0; i < layer->original_in_channels; i++) {
         if (!inactive_in || !inactive_in[i]) {
@@ -37,10 +37,10 @@ void apply_channel_compression(Conv2DLayer *layer, bool *inactive_out, bool *ina
                 layer->in_active_channels_idx[idx++] = i;
             }
         }
-        layer->in_channels = active_in_count;   // UPDATE effective channels
+        layer->in_channels = active_in_count;   
     }
     
-    printf("📊 Compressed Conv2D: %d→%d out_channels, %d→%d in_channels\n",
+    printf("compressed Conv2D: %d→%d out_channels, %d→%d in_channels\n",
            layer->original_out_channels, layer->out_channels,
            layer->original_in_channels, layer->in_channels);
 }

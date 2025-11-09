@@ -4,9 +4,9 @@
 #include <math.h>
 
 #ifdef _WIN32
-#include <malloc.h>  // dla _aligned_malloc i _aligned_free
+#include <malloc.h> 
 #else
-#include <stdlib.h>  // dla aligned_alloc
+#include <stdlib.h>
 #endif
 
 #include "../../include/utils/layer_utils.h" 
@@ -15,8 +15,8 @@
 void he_kaiming_uniform_init(float *weights, size_t size, int in_channels, int kernel_size) {
     float limit = sqrtf(6.0f / (in_channels * kernel_size * kernel_size));
     for (size_t i = 0; i < size; i++) {
-        float rand_val = (float)rand() / RAND_MAX; // [0, 1]
-        weights[i] = (2.0f * rand_val - 1.0f) * limit; // Scale to [-limit, limit]
+        float rand_val = (float)rand() / RAND_MAX; 
+        weights[i] = (2.0f * rand_val - 1.0f) * limit;
     }
 }
 
@@ -38,17 +38,12 @@ void conv2d_initialize(Conv2DLayer *layer, int in_channels, int out_channels, in
     layer->stride = stride;
     layer->padding = padding;
 
-    //layer->deactive_out_channels = (bool*)calloc(out_channels, sizeof(bool));
-    //layer->deactive_in_channels = (bool*)calloc(in_channels, sizeof(bool));  
-
     layer->in_channels = in_channels;
     layer->out_channels = out_channels;
     
-    // 🆕 DODAJ: Store original dimensions for pruning
     layer->original_in_channels = in_channels;
     layer->original_out_channels = out_channels;
     
-    // Initialize mapping pointers to NULL
     layer->in_active_channels_idx = NULL;
     layer->out_active_channels_idx = NULL;
 
@@ -57,7 +52,6 @@ void conv2d_initialize(Conv2DLayer *layer, int in_channels, int out_channels, in
     layer->base.num_weights = weight_size;
     layer->biases = (float *)malloc(out_channels * sizeof(float));
 
-    // weights and bias initalization
     initialize_biases(layer->biases, out_channels, in_channels * kernel_size * kernel_size);
 
     layer->base.inputs = (float *)malloc(input_dim * input_dim * layer->in_channels  * sizeof(float));
@@ -69,8 +63,8 @@ void conv2d_forward(void *self, float *input, size_t input_size, size_t time_ste
     int K  = L->kernel_size;
     int P  = L->padding;
     int S  = L->stride;
-    int IC = L->in_channels;        // EFFECTIVE channels (po pruning)
-    int OC = L->out_channels;       // EFFECTIVE channels (po pruning)
+    int IC = L->in_channels; // EFFECTIVE channels (after pruning)
+    int OC = L->out_channels; // EFFECTIVE channels (after pruning)
     int ORIG_IC = L->original_in_channels;
 
     int OUT_H = calculate_output_dim(H, K, S, P);
@@ -79,9 +73,8 @@ void conv2d_forward(void *self, float *input, size_t input_size, size_t time_ste
 
     memcpy(L->base.inputs, input, input_size * sizeof(float));
 
-    // 🚀 UNIVERSAL LOOP: Works with and without pruning
     for (int oc_idx = 0; oc_idx < OC; ++oc_idx) {
-        // Get actual output channel index
+        // get actual output channel index
         int oc = L->out_active_channels_idx ? L->out_active_channels_idx[oc_idx] : oc_idx;
         
         for (int oy = 0; oy < OUT_H; ++oy) {
@@ -89,7 +82,7 @@ void conv2d_forward(void *self, float *input, size_t input_size, size_t time_ste
                 float acc = L->biases[oc];
                 
                 for (int ic_idx = 0; ic_idx < IC; ++ic_idx) {
-                    // Get actual input channel index
+                    // get actual input channel index
                     int ic = L->in_active_channels_idx ? L->in_active_channels_idx[ic_idx] : ic_idx;
                     
                     for (int ky = 0; ky < K; ++ky) {
@@ -99,7 +92,7 @@ void conv2d_forward(void *self, float *input, size_t input_size, size_t time_ste
                             int ix = ox * S + kx - P;
                             if (ix < 0 || ix >= H) continue;
 
-                            // Use ORIGINAL dimensions for weight indexing
+                            // use ORIGINAL dimensions for weight indexing
                             int widx = oc * (ORIG_IC*K*K) + ic * (K*K) + ky * K + kx;
                             int iidx = ic * (H*H) + iy * H + ix;
                             acc += L->base.weights[widx] * input[iidx];
@@ -117,9 +110,6 @@ void conv2d_free(Conv2DLayer *layer) {
     free(layer->biases);
     free(layer->base.output);
     
-    // 🆕 DODAJ: Free pruning arrays
-    //if (layer->deactive_out_channels) free(layer->deactive_out_channels);
-   // if (layer->deactive_in_channels) free(layer->deactive_in_channels);
     if (layer->out_active_channels_idx) free(layer->out_active_channels_idx);
     if (layer->in_active_channels_idx) free(layer->in_active_channels_idx);
 }

@@ -26,7 +26,6 @@ void spiking_initialize(SpikingLayer *layer, size_t num_neurons, ModelBase **neu
 void spiking_forward(void *self, float *input, size_t input_size, size_t time_step) {
     SpikingLayer *layer = (SpikingLayer *)self;
     
-    // Store input for this time step
     memcpy(layer->base.inputs, input, input_size * sizeof(float));
 
     for (size_t i = 0; i < layer->num_neurons; i++) {
@@ -36,13 +35,11 @@ void spiking_forward(void *self, float *input, size_t input_size, size_t time_st
     }
 }
 
-
-
 void spiking_reset_spike_counts(void *self) {
     SpikingLayer *layer = (SpikingLayer *)self;
     for (size_t i = 0; i < layer->num_neurons; i++) {
         LIFNeuron *neuron = (LIFNeuron *)layer->neurons[i];
-        neuron->base.v = 0;     // or 0 if v_rest is 0
+        neuron->base.v = 0;    
         neuron->spike_count = 0;
         neuron->base.spiked = 0;
     }

@@ -8,20 +8,20 @@ typedef struct {
     size_t num_events;
     SpikeEvent *events;
     int label;
-    int16_t ****frames;    // Optional frame representation
-    float *input;         // Flattened input for neural networks
-    int num_bins;        // Number of time bins if frames are used
+    int16_t ****frames;    // opt frame representation
+    float *input;         // flattened input for neural networks
+    int num_bins;        // no of time bins if frames are used
 } Sample;
 
 typedef struct {
     Sample *samples;
     size_t num_samples;
     FrameSlicingMode slicing_mode; // mode in toFrame method
-    int mode_param;        // param_mode
+    int mode_param;           // param_mode
     int input_channels;
-    int input_width;          // Sensor width
-    int input_height;         // Sensor height
-    int num_classes;    // Number of classes
+    int input_width;          // sensor width
+    int input_height;         // sensor height
+    int num_classes;          // no of classes
 } Dataset;
 
 typedef enum {
@@ -34,16 +34,16 @@ typedef enum {
     FORMAT_UNKNOWN
 } DatasetFormat;
 
-// Core dataset functions
+// main methods
 Dataset *create_empty_dataset(size_t initial_capacity, int width, int height, int channels, int num_classes, FrameSlicingMode mode, int mode_param);
 void free_dataset(Dataset *dataset);
 int add_sample_to_dataset(Dataset *dataset, const SpikeEvent *events, size_t num_events, int label);
 
-// Dataset loading interface
+// dataset loading interface
 Dataset *load_dataset(const char *source_path, DatasetFormat format, 
                      size_t max_samples, bool stabilize, bool denoise);
 
-// Specific dataset loaders
+// specific dataset loaders
 Dataset *load_nmnist_dataset(const char *dir, size_t max_samples, bool stabilize, bool denoise);
 
 #endif // DATASET_LOADER_H

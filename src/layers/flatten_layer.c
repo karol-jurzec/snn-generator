@@ -10,7 +10,7 @@ void flatten_initialize(FlattenLayer *layer, size_t input_size) {
     layer->base.is_spiking = false;
     layer->base.inputs = (float*)malloc(input_size * sizeof(float));
     layer->base.forward = flatten_forward;
-    layer->base.output_size = input_size;  // Output size matches input size (flattening does not change total number of elements)
+    layer->base.output_size = input_size; 
     layer->base.output = (float *)malloc(layer->base.output_size * sizeof(float));
 
 }

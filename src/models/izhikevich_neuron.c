@@ -26,6 +26,4 @@ void izhikevich_update(void *self, float input_current) {
         neuron->u += du;
         neuron->spiked = 0;
     }
-
-    printf("Izhikevich Neuron state: V = %f, U = %f\n", neuron->base.v, neuron->u);
 }

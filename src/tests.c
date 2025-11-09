@@ -34,7 +34,12 @@ static double now_seconds(void) {
 void stmnist_test() {
 	const char *model_architecrure = "scnn_stmnist_architecture.json";
 	const char *model_weights = "scnn_stmnist_weights_bs_64.json";
-	const char *dataset_path_test = "C:/Users/karol/Desktop/karol/agh/praca_snn/dataset/STMNIST/data_submission"; 
+	const char *dataset_path_test = getenv("STMNIST_TEST_PATH");
+
+    if (!dataset_path_test) {
+		fprintf(stderr, "Error: STMNIST_TEST_PATH environment variable not set\n");
+		return;
+	}
 
 	printf("Loading network from %s...\n", model_architecrure);
 	perf_mark_start("network_init");
@@ -83,8 +88,8 @@ void stmnist_test() {
 }
 
 void nmnist_test() {
-    const char *network_config_path_train = "C:/Users/karol/Desktop/karol/agh/praca_snn/data/NMNIST/Train";   
-    const char *network_config_path_test = "C:/Users/karol/Desktop/karol/agh/praca_snn/data/NMNIST/Test"; 
+    const char *network_config_path_train = getenv("NMNIST_TRAIN_PATH");
+    const char *network_config_path_test = getenv("NMNIST_TEST_PATH");
     const char *dataset_path = "snn_nmnist_architecture.json";
 
     // Load the network
