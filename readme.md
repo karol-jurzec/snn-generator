@@ -53,12 +53,25 @@ SpikeEdge consists of three main components:
 
 ### Installation
 
-#### Windows (MSYS2/MinGW)
-```bash
-pacman -S mingw-w64-x86_64-gcc \
-          mingw-w64-x86_64-json-c \
-          mingw-w64-x86_64-matio
-```
+#### Windows (MSYS2/MinGW64)
+
+1. Download and install MSYS2 from [https://www.msys2.org](https://www.msys2.org)
+2. Open the **MSYS2 MSYS** terminal and update packages:
+    ```bash
+    pacman -Syu
+    ```
+3. Close and reopen the terminal, then update again if needed.
+4. Open the **MSYS2 MinGW 64-bit** terminal and install MinGW-w64 toolchain and libraries:
+    ```bash
+    pacman -S --needed base-devel mingw-w64-x86_64-toolchain \
+                   mingw-w64-x86_64-json-c \
+                   mingw-w64-x86_64-matio
+    ```
+5. Verify installation:
+    ```bash
+    gcc --version
+    make --version
+    ```
 
 #### Linux (Ubuntu/Debian)
 ```bash
@@ -66,76 +79,7 @@ sudo apt-get update
 sudo apt-get install gcc libjson-c-dev libmatio-dev build-essential
 ```
 
-#### macOS
-```bash
+#### MacOs
+```
 brew install json-c matio
 ```
-
-## Building
-
-Clone the repository and build:
-
-```bash
-git clone <repository-url>
-cd snn-generator
-make
-```
-
-For optimized release build:
-```bash
-make release
-```
-
-Clean build artifacts:
-```bash
-make clean
-```
-
-## Usage
-
-### Basic Execution
-
-Run the default test:
-```bash
-./snn_generator
-```
-
-### Performance Profiling
-
-Enable performance profiling:
-```bash
-./snn_generator --perf
-```
-
-### Configuring Dataset Paths
-
-Set environment variables for dataset paths:
-
-**Windows (PowerShell):**
-```powershell
-$env:NMNIST_TEST_PATH = "C:/path/to/NMNIST/Test"
-$env:STMNIST_TEST_PATH = "C:/path/to/STMNIST/data_submission"
-```
-
-**Linux/macOS:**
-```bash
-export NMNIST_TEST_PATH="/path/to/NMNIST/Test"
-export STMNIST_TEST_PATH="/path/to/STMNIST/data_submission"
-```
-
-### Model Files
-
-Place your model files in the project root:
-- Architecture files: `*_architecture.json`
-- Weight files: `*_weights_*.json`
-
-Example files included:
-- `snn_nmnist_architecture.json` / `snn_nmnist_weights_bs_32.json`
-- `scnn_stmnist_architecture.json` / `scnn_stmnist_weights_bs_64.json`
-
-## Supported Datasets
-
-- **NMNIST**: Neuromorphic MNIST dataset
-- **STMNIST**: Spiking Temporal MNIST dataset
-
-## Project Structure

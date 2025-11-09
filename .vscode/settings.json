@@ -33,7 +33,8 @@
         "channel_pruning.h": "c",
         "perf.h": "c",
         "time.h": "c",
-        "linear_layer.h": "c"
+        "linear_layer.h": "c",
+        "stdbool.h": "c"
     },
 "C_Cpp.errorSquiggles": "disabled"
 }

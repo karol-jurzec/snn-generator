@@ -28,6 +28,7 @@ float test(Network *network, Dataset *dataset);
 void compute_probabilities(float *spike_counts, size_t num_neurons, float *probabilities);
 void sample_test(Network *network, const char* path);
 void optimize_network(Network* network);
+int predict_single_sample(Network *network, Sample *sample, Dataset *dataset);
 
 
 

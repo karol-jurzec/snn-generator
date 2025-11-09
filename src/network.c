@@ -151,6 +151,47 @@ float test(Network *network, Dataset *dataset) {
 	return accuracy;
 }
 
+int  predict_single_sample(Network *network, Sample *sample, Dataset *dataset) {
+    float *input = sample->input;
+    size_t input_size_per_bin = dataset->input_channels * dataset->input_width * dataset->input_height;
+
+    for (size_t l = 0; l < network->num_layers; l++) {
+        if (network->layers[l]->is_spiking) {
+            network->layers[l]->reset_spike_counts(network->layers[l]);
+        }
+    }
+
+    for (int t = 0; t < sample->num_bins; t++) {
+        float *frame = &input[t * input_size_per_bin];
+        network->layers[0]->forward(network->layers[0], frame, input_size_per_bin, 0);
+        for (size_t j = 1; j < network->num_layers; j++) {
+            network->layers[j]->forward(network->layers[j], network->layers[j - 1]->output,
+                                        network->layers[j - 1]->output_size, 0);
+        }
+    }
+
+    SpikingLayer *output_layer = (SpikingLayer *)network->layers[network->num_layers - 1];
+    float spike_counts[output_layer->num_neurons];
+    for (size_t n = 0; n < output_layer->num_neurons; n++) {
+        LIFNeuron *neuron = (LIFNeuron *)output_layer->neurons[n];
+        spike_counts[n] = (float)neuron->spike_count;
+    }
+
+    float probabilities[output_layer->num_neurons];
+    compute_probabilities(spike_counts, output_layer->num_neurons, probabilities);
+
+    int predicted_label = 0;
+    float max_prob = probabilities[0];
+    for (size_t p = 1; p < output_layer->num_neurons; p++) {
+        if (probabilities[p] > max_prob) {
+            max_prob = probabilities[p];
+            predicted_label = p;
+        }
+    }
+
+    return predicted_label;
+}
+
 void optimize_network(Network* network) {
     (void)network;
     // Baseline (no-op): optymalizacje wyłączone

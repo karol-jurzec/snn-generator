@@ -81,3 +81,199 @@ Dataset *load_dataset(const char *source_path, DatasetFormat format, size_t max_
             return NULL;
     }
 }
+
+DatasetFormat detect_format_from_file(const char *file_path) {
+    if (!file_path) return FORMAT_UNKNOWN;
+    
+    const char *ext = strrchr(file_path, '.');
+    if (!ext) return FORMAT_UNKNOWN;
+    
+    if (strcmp(ext, ".bin") == 0) {
+        return FORMAT_NMNIST;
+    } else if (strcmp(ext, ".mat") == 0) {
+        return FORMAT_STMNIST;
+    }
+    
+    return FORMAT_UNKNOWN;
+}
+
+Dataset *load_single_sample_file(const char *file_path, int label, DatasetFormat format, bool stabilize, bool denoise) {
+    if (!file_path) {
+        fprintf(stderr, "Error: file_path is NULL\n");
+        return NULL;
+    }
+
+    if (format == FORMAT_UNKNOWN) {
+        format = detect_format_from_file(file_path);
+        if (format == FORMAT_UNKNOWN) {
+            fprintf(stderr, "Error: Could not detect format from file: %s\n", file_path);
+            return NULL;
+        }
+    }
+
+    Dataset *dataset = NULL;
+    
+    switch (format) {
+        case FORMAT_NMNIST: {
+            dataset = create_empty_dataset(1, NMNIST_WIDTH, NMNIST_HEIGHT, NMNIST_CHANNELS, NMNIST_CLASSES, FRAME_BY_N_TIME_BINS, 50);
+            if (!dataset) return NULL;
+
+            FILE *file = fopen(file_path, "rb");
+            if (!file) {
+                fprintf(stderr, "Error: Failed to open file: %s\n", file_path);
+                free_dataset(dataset);
+                return NULL;
+            }
+
+            fseek(file, 0, SEEK_END);
+            size_t file_size = ftell(file);
+            fseek(file, 0, SEEK_SET);
+            size_t num_events = file_size / 5;
+
+            SpikeEvent *events = malloc(num_events * sizeof(SpikeEvent));
+            if (!events) {
+                fclose(file);
+                free_dataset(dataset);
+                return NULL;
+            }
+
+            unsigned char buffer[5];
+            for (size_t j = 0; j < num_events; j++) {
+                if (fread(buffer, 1, 5, file) != 5) {
+                    fclose(file);
+                    free(events);
+                    free_dataset(dataset);
+                    return NULL;
+                }
+                
+                events[j].x = buffer[0];
+                events[j].y = buffer[1];
+                events[j].polarity = (buffer[2] >> 7) & 1;
+                events[j].timestamp = ((buffer[2] & 0x7F) << 16) | (buffer[3] << 8) | buffer[4];
+                events[j].neuron_id = events[j].y * NMNIST_WIDTH + events[j].x;
+                events[j].channel = 0;
+            }
+            fclose(file);
+
+            if (stabilize) {
+                stabilize_nmnist_events(events, num_events);
+            }
+
+            if (denoise) {
+                num_events = denoise_events(events, num_events, 10000);
+            }
+
+            if (add_sample_to_dataset(dataset, events, num_events, label) != 0) {
+                free(events);
+                free_dataset(dataset);
+                return NULL;
+            }
+
+            free(events);
+            break;
+        }
+        
+        case FORMAT_STMNIST: {
+            dataset = create_empty_dataset(1, STMNIST_WIDTH, STMNIST_HEIGHT, STMNIST_CHANNELS, STMNIST_CLASSES, FRAME_BY_TIME_WINDOW, 10000);
+            if (!dataset) return NULL;
+
+            mat_t *matfp = Mat_Open(file_path, MAT_ACC_RDONLY);
+            if (!matfp) {
+                fprintf(stderr, "Failed to open MAT file: %s\n", file_path);
+                free_dataset(dataset);
+                return NULL;
+            }
+
+            matvar_t *var = Mat_VarRead(matfp, "spiketrain");
+            if (!var || var->rank != 2 || var->data_type != MAT_T_DOUBLE) {
+                fprintf(stderr, "Invalid spiketrain variable in: %s\n", file_path);
+                if (var) Mat_VarFree(var);
+                Mat_Close(matfp);
+                free_dataset(dataset);
+                return NULL;
+            }
+
+            size_t num_rows = var->dims[0];    // Should be 101
+            size_t num_events = var->dims[1];
+            
+            if (num_rows != 101) {
+                fprintf(stderr, "Unexpected matrix shape in %s: %zux%zu (expected 101xn)\n", 
+                        file_path, num_rows, num_events);
+                Mat_VarFree(var);
+                Mat_Close(matfp);
+                free_dataset(dataset);
+                return NULL;
+            }
+
+            double *spiketrain = (double *)var->data;
+
+            // Count valid events
+            size_t valid_events = 0;
+            for (size_t e = 0; e < num_events; e++) {
+                for (size_t t = 0; t < 100; t++) {
+                    if (spiketrain[t + e * num_rows] != 0.0) {
+                        valid_events++;
+                    }
+                }
+            }
+
+            if (valid_events == 0) {
+                fprintf(stderr, "No valid events found in: %s\n", file_path);
+                Mat_VarFree(var);
+                Mat_Close(matfp);
+                free_dataset(dataset);
+                return NULL;
+            }
+
+            // Allocate and extract events
+            SpikeEvent *events = malloc(valid_events * sizeof(SpikeEvent));
+            if (!events) {
+                Mat_VarFree(var);
+                Mat_Close(matfp);
+                free_dataset(dataset);
+                return NULL;
+            }
+
+            size_t event_idx = 0;
+            for (size_t e = 0; e < num_events; e++) {
+                double timestamp = spiketrain[100 + e * num_rows];
+                
+                for (size_t t = 0; t < 100; t++) {
+                    double val = spiketrain[t + e * num_rows];
+                    if (val == 0.0) continue;
+
+                    int x = t % 10;
+                    int y = t / 10;
+                    int p = val > 0 ? 1 : 0;
+
+                    events[event_idx].x = x;
+                    events[event_idx].y = y;
+                    events[event_idx].timestamp = (uint64_t)(timestamp * 1e6);
+                    events[event_idx].polarity = (int8_t)p;
+                    events[event_idx].neuron_id = y * STMNIST_WIDTH + x;
+                    events[event_idx].channel = 0;
+                    event_idx++;
+                }
+            }
+
+            if (add_sample_to_dataset(dataset, events, valid_events, label) != 0) {
+                free(events);
+                Mat_VarFree(var);
+                Mat_Close(matfp);
+                free_dataset(dataset);
+                return NULL;
+            }
+
+            free(events);
+            Mat_VarFree(var);
+            Mat_Close(matfp);
+            break;
+        }
+        
+        default:
+            fprintf(stderr, "Unsupported format for single file loading\n");
+            return NULL;
+    }
+
+    return dataset;
+}

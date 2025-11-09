@@ -4,6 +4,7 @@
 #include <stddef.h>
 #include <math.h>
 #include <stdlib.h>
+#include <stdbool.h>
 
 size_t calculate_output_dim(size_t input_dim, int kernel_size, int stride, int padding);
 void initialize_biases(float *biases, size_t size, int fan_in);

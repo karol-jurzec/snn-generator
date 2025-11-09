@@ -134,5 +134,3 @@ void nmnist_test() {
 
 
 
-
-
