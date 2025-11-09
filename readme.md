@@ -1,6 +1,6 @@
 # SpikeEdge Runtime
 
-A lightweight C-based runtime for efficient inference of Spiking Neural Networks (SNNs) trained in SNNTorch. SpikeEdge enables deployment of trained SNN models on resource-constrained embedded devices.
+A C-based runtime for inference of Spiking Neural Networks (SNNs) trained in SNNTorch. SpikeEdge enables deployment of trained SNN models on resource-constrained embedded devices.
 
 ## Overview
 
@@ -8,7 +8,6 @@ SpikeEdge provides a C-based runtime that bridges the gap between Python-based S
 
 - Exporting trained models from SNNTorch to JSON format
 - Reconstructing and executing models in efficient C code
-- Supporting multiple event-based datasets (NMNIST, STMNIST, N-CARS, DVS Gesture)
 - Providing optimization strategies like spiking activity-based pruning
 
 ## Deployment Pipeline
@@ -17,7 +16,7 @@ The workflow separates training and inference:
 
 1. **Training Phase**: Models are designed and trained in Python using PyTorch/SNNTorch
 2. **Export Phase**: Trained models (architecture + weights) are exported to JSON
-3. **Inference Phase**: JSON files are loaded and executed by the C runtime on target hardware
+3. **Inference Phase**: JSON files are loaded and executed by the C runtime
 
 This design combines the flexibility of Python research environments with the efficiency of low-level C execution.
 
