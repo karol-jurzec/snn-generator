@@ -3,7 +3,7 @@ CC = gcc
 CFLAGS = -Wall -Wextra -g -I$(INCLUDE_DIR) -I$(JSON_C_INCLUDE)
 
 LDFLAGS = -L$(JSON_C_LIB)
-LDLIBS = -ljson-c -lpthread -lm -lmatio -lpsapi
+LDLIBS = -ljson-c -lpthread -lm -lmatio -lpsapi -lopenblas
 
 SRC_DIR = src
 INCLUDE_DIR = include

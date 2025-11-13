@@ -18,6 +18,13 @@ static void nmnist_to_spike_event(const unsigned char *buffer, SpikeEvent *event
     event->channel = 0;
 }
 
+void normalize_path(char *path) {
+#ifdef _WIN32
+    for (char *p = path; *p; ++p)
+        if (*p == '\\') *p = '/';
+#endif
+}
+
 Dataset *load_nmnist_dataset(const char *data_dir, size_t max_samples, bool stabilize, bool denoise) {
     Dataset *dataset = create_empty_dataset(max_samples, NMNIST_WIDTH, NMNIST_HEIGHT, NMNIST_CHANNELS, NMNIST_CLASSES, FRAME_BY_N_TIME_BINS, 300);
     if (!dataset) {

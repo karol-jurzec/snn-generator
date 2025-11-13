@@ -3,6 +3,8 @@
 
 #include <stddef.h>
 #include "layer_base.h"
+#include <stdbool.h>
+
 
 // Structure for the Linear layer
 typedef struct {
@@ -12,6 +14,14 @@ typedef struct {
     float *weights;          // Weight matrix
     float *biases;           // Bias vector
     float *output;           // Output vector
+
+    int *in_active_channels_idx;
+    int *out_active_channels_idx;
+
+    float *weight_mat;
+    int cache_IC;
+    int cache_OC;
+    bool weight_mat_valid;
 
     float *input;            // Input buffer
 } LinearLayer;

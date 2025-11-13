@@ -1,6 +1,6 @@
 # SpikeEdge Runtime
 
-A C-based runtime for inference of Spiking Neural Networks (SNNs) trained in SNNTorch. SpikeEdge enables deployment of trained SNN models on resource-constrained embedded devices.
+A lightweight C-based runtime for efficient inference of Spiking Neural Networks (SNNs) trained in SNNTorch. SpikeEdge enables deployment of trained SNN models on resource-constrained embedded devices.
 
 ## Overview
 
@@ -8,6 +8,7 @@ SpikeEdge provides a C-based runtime that bridges the gap between Python-based S
 
 - Exporting trained models from SNNTorch to JSON format
 - Reconstructing and executing models in efficient C code
+- Supporting multiple event-based datasets (NMNIST, STMNIST, N-CARS, DVS Gesture)
 - Providing optimization strategies like spiking activity-based pruning
 
 ## Deployment Pipeline
@@ -16,7 +17,7 @@ The workflow separates training and inference:
 
 1. **Training Phase**: Models are designed and trained in Python using PyTorch/SNNTorch
 2. **Export Phase**: Trained models (architecture + weights) are exported to JSON
-3. **Inference Phase**: JSON files are loaded and executed by the C runtime
+3. **Inference Phase**: JSON files are loaded and executed by the C runtime on target hardware
 
 This design combines the flexibility of Python research environments with the efficiency of low-level C execution.
 
@@ -82,33 +83,3 @@ sudo apt-get install gcc libjson-c-dev libmatio-dev build-essential
 ```
 brew install json-c matio
 ```
-
-### Building
-
-Clone the repository and build:
-```
-git clone <repository-url>
-cd snn-generator
-make release
-```
-
-### Clean build artifacts:
-```
-make clean
-```
-### Usage
-Basic Execution
-
-Sample run:
-```
-./snn_generator snn_nmnist_architecture.json snn_nmnist_weights_bs_32.json input/nmnist/1.bin
-```
-*Note: In a real-world embedded implementation, the input data typically comes from a live event-based sensor. In this case, for demonstration purposes, a static .bin or .mat file with raw events is used.
-
-### Optimization Strategies
-- **Channel Pruning**: Removes less active channels in convolutional layers
-- **Bidirectional Pruning**: Combines forward and backward pruning strategies
-
-### References
-- SNNTorch: Spiking Neural Networks in PyTorch
-- PyTorch: Deep learning framework
